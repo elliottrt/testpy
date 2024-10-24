@@ -3,6 +3,17 @@ import sys
 import os
 import subprocess
 from typing import *
+from dataclasses import dataclass
+
+@dataclass
+class TestResult:
+	test_file_path: str
+	expected_output: bytes
+	actual_output: bytes
+
+	# Returns whether the test has passed or failed.
+	def passed(self) -> bool:
+		return self.expected_output == self.actual_output
 
 
 # TODO: comment the processes for each function
@@ -113,55 +124,50 @@ def record_tests(program_path: str, test_paths: list[str], record_file_extension
 # program_path: str -- the path to the program to test.
 # test_paths: list[str] -- a list of test case file paths.
 # record_file_extension: str -- the file extension of record files.
-def run_tests(program_path: str, test_paths: list[str], record_file_extension: str) -> list[tuple[str, bytes, bytes]]:
+def run_tests(program_path: str, test_paths: list[str], record_file_extension: str) -> list[TestResult]:
 	results = []
 
 	for test_path in test_paths:
 		record_file_path = record_path_of(test_path, record_file_extension)
-		expected = read_record_of(record_file_path)
+		expected_output = read_record_of(record_file_path)
 
-		if expected is None:
+		if expected_output is None:
 			print(f'record {record_file_path} does not exist, skipping...')
 		else:
-			actual = run_and_capture(program_path, test_path)
-			results.append((test_path, expected, actual))
+			actual_output = run_and_capture(program_path, test_path)
+			results.append(TestResult(
+				test_file_path=test_path,
+				expected_output=expected_output,
+				actual_output=actual_output
+			))
 
 	return results
-
-
-# Returns whether a test has passed or failed.
-# expected_output: bytes -- the expected test output.
-# actual_output: bytes -- the actual test output.
-def did_test_pass(expected_output: bytes, actual_output: bytes) -> bool:
-	return expected_output == actual_output
 
 
 # Print test failure information.
 # test_path: str -- the test case file path.
 # expected_output: bytes -- the expected test output.
 # actual_output: bytes -- the actual test output.
-def print_failure(expected_output: bytes, actual_output: bytes) -> None:
-	print(f"    EXPECTED: {expected_output!r}")
-	print(f"    ACTUAL: {actual_output!r}")
+def print_failure(result: TestResult) -> None:
+	print(f"    EXPECTED: {result.expected_output!r}")
+	print(f"    ACTUAL: {result.actual_output!r}")
 
-# TODO: use dataclass instead of tuple for results
 
 # Print test case results.
 # results: list of tuples of (test_case_path, expected_output, actual_output).
-def display_results(results: list[tuple[str, bytes, bytes]]) -> int:
+def display_results(results: list[TestResult]) -> int:
 	tests_passed = 0
 
-	for (test_path, expected, actual) in results:
-
+	for result in results:
 		# TODO: print out full command used
-		print(f'TEST: \'{test_path}\'... ', end='')
-		if did_test_pass(expected, actual):
+		print(f'TEST: \'{result.test_file_path}\'... ', end='')
+		if result.passed():
 			# TODO: better way of printing colors
 			print(f'\033[38;5;{2}m{'OK'}\033[0m')
 			tests_passed += 1
 		else:
 			print(f'\033[38;5;{9}m{'FAIL'}\033[0m')
-			print_failure(expected, actual)
+			print_failure(result)
 
 	total_tests = len(results)
 	print(f'{tests_passed}/{total_tests} tests passed')

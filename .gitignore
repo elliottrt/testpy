@@ -1,0 +1,5 @@
+# folder for testing test.py
+tests/
+
+# mypy caching
+.mypy_cache/

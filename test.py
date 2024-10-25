@@ -38,13 +38,25 @@ class TestCaseOutput:
 		}
 
 
+# Exception information about executed test cases.
+class TestCaseException:
+	def __init__(self, command: str, exception: Exception):
+		self.command = command
+		self.exception = exception
+
+	# Returns the description of what caused this exception.
+	# return: str -- the description of what caused this exception.
+	def error_string(self) -> str:
+		return f'Exception executing command "{self.command}": {self.exception}'
+
+
 # Dataclass containing information about test results.
 @dataclass
 class TestResult:
 	test_path: str
 	record_path: str
 	expected_output: Optional[TestCaseOutput]
-	actual_output: Optional[TestCaseOutput]
+	actual_output: Optional[Union[TestCaseOutput, TestCaseException]]
 
 	# Returns whether the test has passed or failed.
 	# return: bool -- true if this test passed, false otherwise.
@@ -59,7 +71,6 @@ class TestResult:
 
 # Class that contains and formats program invocations.
 class ProgramTemplate:
-
 	# Constructor for ProgramTemplate.
 	# program_command: str -- command template for test execution.
 	# symbol: str -- symbol to replace with the test case path.
@@ -200,20 +211,18 @@ def write_record_of(record_path: str, output: TestCaseOutput) -> None:
 		)
 
 
-# TODO: create an exception class containing the executed shell command and the exception
 # Runs the program that is being tested with the test case file.
 # program_path: str -- the path to the program to test.
 # test_case_path: str -- the path to the test case file.
 # return: bytes -- the stdout output of the test being run.
-def run_and_capture(template: ProgramTemplate, test_path: str) -> Union[TestCaseOutput, Exception]:
-	# TODO: catch exceptions raised by this process
+def run_and_capture(template: ProgramTemplate, test_path: str) -> Union[TestCaseOutput, TestCaseException]:
 	# format the test case command and split it for subprocess
 	test_command = template.format(test_path)
 
 	try:
 		process = subprocess.run(test_command.split(' '), capture_output=True)
 	except Exception as excp:
-		return excp
+		return TestCaseException(test_command, excp)
 
 	return TestCaseOutput(
 		process.stdout,
@@ -234,7 +243,10 @@ def update_tests(template: ProgramTemplate, test_paths: list[str], record_file_e
 		# find the record it belongs to
 		record_path = record_path_of(test_path, record_file_extension)
 		# update the record with the new output
-		write_record_of(record_path, actual_output)
+		if isinstance(actual_output, TestCaseOutput):
+			write_record_of(record_path, actual_output)
+		else:
+			print_error(actual_output.error_string())
 
 
 # Run each test, compare it to the corresponding record file, and return the results of each test.
@@ -270,9 +282,12 @@ def print_failure(result: TestResult) -> None:
 	# if stdout, retcode are equal but stderr, differs,
 	# should we only print stderr?
 
-	# print out expected and actual for failed test cases
-	print(f"    EXPECTED: {result.expected_output!r}")
-	print(f"    ACTUAL:   {result.actual_output!r}")
+	if isinstance(result.actual_output, TestCaseOutput):
+		# print out expected and actual for failed test cases
+		print(f"    EXPECTED: {result.expected_output!r}")
+		print(f"    ACTUAL:   {result.actual_output!r}")
+	elif isinstance(result.actual_output, TestCaseException):
+		print(f"    ERROR: {result.actual_output.error_string()}")
 
 
 # Print test case results.

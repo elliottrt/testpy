@@ -18,8 +18,8 @@ TEST_CASE_OUTPUT_RETURNCODE = 'returncode'
 # Dataclass containing test result information.
 @dataclass
 class TestCaseOutput:
-	stdout: bytes
-	stderr: bytes
+	stdout: str
+	stderr: str
 	returncode: int
 
 	def __eq__(self, value: Any) -> bool:
@@ -32,8 +32,8 @@ class TestCaseOutput:
 
 	def to_json(self) -> dict[str, Union[str, int]]:
 		return {
-			TEST_CASE_OUTPUT_STDOUT: str(self.stdout, encoding=TEST_CASE_OUTPUT_ENCODING),
-			TEST_CASE_OUTPUT_STDERR: str(self.stderr, encoding=TEST_CASE_OUTPUT_ENCODING),
+			TEST_CASE_OUTPUT_STDOUT: self.stdout,
+			TEST_CASE_OUTPUT_STDERR: self.stderr,
 			TEST_CASE_OUTPUT_RETURNCODE: self.returncode
 		}
 
@@ -189,8 +189,8 @@ def read_record_of(record_path: str) -> Optional[TestCaseOutput]:
 			# TODO: make sure the data is in the right format and that the keys exist
 			# return some value that allows the tester to print out a new test case result: bad record
 			return TestCaseOutput(
-				bytes(js[TEST_CASE_OUTPUT_STDOUT], encoding=TEST_CASE_OUTPUT_ENCODING),
-				bytes(js[TEST_CASE_OUTPUT_STDERR], encoding=TEST_CASE_OUTPUT_ENCODING),
+				js[TEST_CASE_OUTPUT_STDOUT],
+				js[TEST_CASE_OUTPUT_STDERR],
 				js[TEST_CASE_OUTPUT_RETURNCODE]
 			)
 	# otherwise return None
@@ -226,8 +226,9 @@ def run_and_capture(template: ProgramTemplate, test_path: str) -> Union[TestCase
 		return TestCaseException(test_command, excp)
 
 	return TestCaseOutput(
-		process.stdout,
-		process.stderr,
+		# convert the bytes to a utf-8 string for storage
+		str(process.stdout, encoding=TEST_CASE_OUTPUT_ENCODING),
+		str(process.stderr, encoding=TEST_CASE_OUTPUT_ENCODING),
 		process.returncode
 	)
 
@@ -243,7 +244,7 @@ def update_tests(template: ProgramTemplate, test_paths: list[str], record_file_e
 		record_path = record_path_of(test_path, record_file_extension)
 		if create_empty:
 			# write an empty test case if requested
-			write_record_of(record_path, TestCaseOutput(b'', b'', 0))
+			write_record_of(record_path, TestCaseOutput('', '', 0))
 		else:
 			# get the output from the test case
 			actual_output = run_and_capture(template, test_path)
@@ -289,8 +290,8 @@ def print_failure(result: TestResult) -> None:
 
 	if isinstance(result.actual_output, TestCaseOutput):
 		# print out expected and actual for failed test cases
-		print(f"    EXPECTED: {result.expected_output!r}")
-		print(f"    ACTUAL:   {result.actual_output!r}")
+		print(f"    EXPECTED: {result.expected_output}")
+		print(f"    ACTUAL:   {result.actual_output}")
 	elif isinstance(result.actual_output, TestCaseException):
 		print(f"    ERROR: {result.actual_output.error_string()}")
 

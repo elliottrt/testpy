@@ -100,6 +100,7 @@ class TestArguments(argparse.Namespace):
 	update: bool
 	program_template: str
 	symbol: str
+	create_empty: bool
 
 
 # Prints an error message.
@@ -236,17 +237,21 @@ def run_and_capture(template: ProgramTemplate, test_path: str) -> Union[TestCase
 # test_paths: list[str] -- a list of test case file paths.
 # record_file_extension: str -- the file extension of record files.
 # return: None.
-def update_tests(template: ProgramTemplate, test_paths: list[str], record_file_extension: str) -> None:
+def update_tests(template: ProgramTemplate, test_paths: list[str], record_file_extension: str, create_empty: bool) -> None:
 	for test_path in test_paths:
-		# get the output from the test case
-		actual_output = run_and_capture(template, test_path)
 		# find the record it belongs to
 		record_path = record_path_of(test_path, record_file_extension)
-		# update the record with the new output
-		if isinstance(actual_output, TestCaseOutput):
-			write_record_of(record_path, actual_output)
+		if create_empty:
+			# write an empty test case if requested
+			write_record_of(record_path, TestCaseOutput(b'', b'', 0))
 		else:
-			print_error(actual_output.error_string())
+			# get the output from the test case
+			actual_output = run_and_capture(template, test_path)
+			# update the record with the new output
+			if isinstance(actual_output, TestCaseOutput):
+				write_record_of(record_path, actual_output)
+			else:
+				print_error(actual_output.error_string())
 
 
 # Run each test, compare it to the corresponding record file, and return the results of each test.
@@ -358,6 +363,7 @@ def create_argparser(this_name: str) -> argparse.ArgumentParser:
 	args.add_argument('-e', '--test-ext', default=None, type=str, help='file extension of test cases')
 	args.add_argument('-r', '--record-ext', default='rec', type=str, help='file extension of record cases, default=\'rec\'')
 	args.add_argument('-s', '--symbol', default='@', type=str, help='symbol to replace with test case in command template, default=\'@\'')
+	args.add_argument('-c', '--create-empty', action='store_true', help='create empty record files for manual test case writing')
 
 	return args
 
@@ -383,8 +389,8 @@ def do_tests(argv: list[str]) -> int:
 	# make sure the test directory exists
 	if tests_to_run is not None:
 		# if we need to update the tests, do that
-		if settings.update:
-			update_tests(program_template, tests_to_run, settings.record_ext)
+		if settings.update or settings.create_empty:
+			update_tests(program_template, tests_to_run, settings.record_ext, settings.create_empty)
 			return 0
 		# otherwise run the tests and return the exitcode display_results returns
 		else:

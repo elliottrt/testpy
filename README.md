@@ -13,6 +13,8 @@ If the command requires more complexity, write out the command and replace all r
 ### Updating Test Cases
 When run with the option `-u` or `--update`, all test cases will be evaluated and their results stored in record files for future test evaluations to check against.
 
+The `-c` and `--create-empty` options will generate empty test case records, which may be edited to manually create test cases.
+
 ### Test Case Customization
 The file extension of test cases may be specified with `-e <extension>` and `--test-ext <extenision>`, or left empty, in which case all files except record files are tested.
 

@@ -4,7 +4,7 @@ import os
 import sys
 import argparse
 import subprocess
-from typing import *
+from typing import cast, Optional
 from dataclasses import dataclass
 
 
@@ -17,7 +17,6 @@ class TestResult:
 	expected_output: bytes
 	actual_output: bytes
 	skipped: bool
-
 
 	# Returns whether the test has passed or failed.
 	# return: bool -- true if this test passed, false otherwise.
@@ -74,7 +73,8 @@ def print_usage(this_name: str, error_message: Optional[str] = None) -> None:
 	print('Usage:')
 	print(f'\t{this_name} <program name> <tests folder> [-ext <test file extension>] [-record]')
 
-	# display the error message if there is one, and separate it from the usage with a new line.
+	# display the error message if there is one,
+	# and separate it from the usage with a new line.
 	if error_message is not None:
 		print('')
 		print_error(error_message)
@@ -102,16 +102,19 @@ def is_valid_dir(path: str) -> bool:
 def get_tests(test_dir_path: str, record_file_extension: str, test_file_extension: Optional[str]) -> Optional[list[str]]:
 	# make sure the test directory is valid
 	if is_valid_dir(test_dir_path):
+
 		# get all the items, and include the full paths from where this is executed
-		all_items = [os.path.join(test_dir_path, fn) for fn in os.listdir(test_dir_path)]
+		matches = [os.path.join(test_dir_path, fn) for fn in os.listdir(test_dir_path)]
+
 		# make sure these are all files that exist, and are not record files
-		matches = [fp for fp in all_items if is_valid_file(fp) and not fp.endswith(record_file_extension)]
+		matches = [fp for fp in matches if is_valid_file(fp) and not fp.endswith(record_file_extension)]
+
 		# if the user specified a test file extension, filter for that
 		if test_file_extension is not None:
 			matches = [fp for fp in matches if fp.endswith(test_file_extension)]
+
 		# sort them so tests are run in alphabetical order
-		matches.sort()
-		return matches
+		return sorted(matches)
 	# if the directory wasn't valid, return None
 	else:
 		return None
@@ -225,7 +228,7 @@ def display_results(results: list[TestResult]) -> int:
 
 	for result in results:
 		print(f'TEST: \'{result.test_path}\'... ', end='')
-		# if result was skipped, ignore this case and adjust total tests to reflect this
+		# if result was skipped, ignore this case and adjust total tests accordingly
 		if result.skipped:
 			print(f'\033[38;5;{8}m{'SKIPPED, NO RECORD'}\033[0m')
 			total_tests -= 1
@@ -305,7 +308,7 @@ def do_tests(argv: list[str]) -> int:
 	# create program template and get all the tests to run
 	program_template = ProgramTemplate(settings.program_template, settings.symbol)
 	tests_to_run = get_tests(settings.test_dir, settings.record_ext, settings.test_ext)
-	
+
 	# make sure the test directory exists
 	if tests_to_run is not None:
 		# if we need to update the tests, do that
@@ -316,7 +319,7 @@ def do_tests(argv: list[str]) -> int:
 		else:
 			test_results = run_tests(program_template, tests_to_run, settings.record_ext)
 			return display_results(test_results)
-	
+
 	# if the test directory didn't exist, print that error
 	else:
 		print_error(f'directory \'{settings.test_dir}\' does not exist or is not a directory')

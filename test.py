@@ -48,6 +48,17 @@ class ProgramTemplate:
 		return self.program_template.replace(self.symbol, test_path)
 
 
+# Contains a list of all arguments used by this program.
+@dataclass
+class TestArguments(argparse.Namespace):
+	test_ext: str
+	record_ext: str
+	test_dir: str
+	update: bool
+	program_template: str
+	symbol: str
+
+
 # Prints an error message.
 # error_message: str -- the error message to print.
 # return: None.
@@ -149,7 +160,12 @@ def run_and_capture(template: ProgramTemplate, test_path: str) -> bytes:
 	# format the test case command and split it for subprocess
 	test_command = template.format(test_path).split(' ')
 	process = subprocess.run(test_command, capture_output=True)
-	return process.stdout
+
+	stdout = process.stdout
+	stderr = process.stderr
+	exitcd = process.returncode
+
+	return stdout
 
 
 # Record test results to test against in future runs.
@@ -280,7 +296,7 @@ def do_tests(argv: list[str]) -> int:
 	argparser = create_argparser(argv[0])
 
 	# for some reason, argparse assumes the first element isn't the program name
-	settings = argparser.parse_args(argv[1:])
+	settings = cast(TestArguments, argparser.parse_args(argv[1:]))
 
 	# make sure the test file extension and the record file extension aren't equal
 	if settings.test_ext is not None and extensions_equal(settings.test_ext, settings.record_ext):

@@ -1,0 +1,5 @@
+mypy test.py --disallow-any-expr --disallow-any-decorated --disallow-any-explicit \
+ --disallow-any-generics --disallow-subclassing-any --disallow-untyped-calls \
+ --disallow-untyped-defs --disallow-incomplete-defs --warn-redundant-casts \
+ --warn-unused-ignores --warn-return-any --warn-unreachable \
+ --strict-equality --extra-checks --show-column-numbers --pretty

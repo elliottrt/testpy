@@ -5,7 +5,7 @@ import sys
 import json
 import argparse
 import subprocess
-from typing import cast, Optional, Union, Any
+from typing import cast, Optional, Union, Any, Generator
 from dataclasses import dataclass
 
 
@@ -14,9 +14,9 @@ TEST_CASE_OUTPUT_STDERR = 'stderr'
 TEST_CASE_OUTPUT_RETURNCODE = 'returncode'
 
 
-# TODO: review doc comments and make sure all of the types are right
+# TODO: doc comments for all class functions
 # TODO: put everything into one class that takes all of the options so this can be more easily used from other files
-
+# TODO: convert things that return lists to generators with yield
 
 # Dataclass containing test result information.
 @dataclass
@@ -185,8 +185,8 @@ def record_path_of(test_path: str, record_file_extension: str) -> str:
 # Returns the bytes of a test case record file.
 # If the case cannot be found, returns None.
 # record_path: str -- the file path of the test case record.
-# return: Union[TestCaseOutput | str] -- the expected test case output, or error message if the record file path is invalid.
-def read_record_of(record_path: str) -> Union[TestCaseOutput | str]:
+# return: Union[TestCaseOutput, str] -- the expected test case output, or error message if the record file path is invalid.
+def read_record_of(record_path: str) -> Union[TestCaseOutput, str]:
 	# return the bytes if the file exists
 	if is_valid_file(record_path):
 		with open(record_path, 'r') as record:
@@ -210,7 +210,7 @@ def read_record_of(record_path: str) -> Union[TestCaseOutput | str]:
 
 # Writes bytes to a test case record file.
 # record_path: str -- the file path of the test case record.
-# output_bytes: bytes -- the bytes to write.
+# output: TestCaseOutput -- the test case output to write.
 # return: None.
 def write_record_of(record_path: str, output: TestCaseOutput) -> None:
 	with open(record_path, 'w') as record:
@@ -223,9 +223,9 @@ def write_record_of(record_path: str, output: TestCaseOutput) -> None:
 
 
 # Runs the program that is being tested with the test case file.
-# program_path: str -- the path to the program to test.
+# template: ProgramTemplate -- the program template to execute.
 # test_case_path: str -- the path to the test case file.
-# return: bytes -- the stdout output of the test being run.
+# return: Union[TestCaseOutput, TestCaseException] -- the expected test case output or an exception if one occurred.
 def run_and_capture(template: ProgramTemplate, test_path: str) -> Union[TestCaseOutput, TestCaseException]:
 	# format the test case command and split it for subprocess
 	test_command = template.format(test_path)
@@ -244,9 +244,10 @@ def run_and_capture(template: ProgramTemplate, test_path: str) -> Union[TestCase
 
 
 # Record test results to test against in future runs.
-# program_path: str -- the path to the program to test.
+# template: ProgramTemplate -- the program template to execute.
 # test_paths: list[str] -- a list of test case file paths.
 # record_file_extension: str -- the file extension of record files.
+# create_empty: bool -- if set, creates empty test case files for manual editing.
 # return: None.
 def update_tests(template: ProgramTemplate, test_paths: list[str], record_file_extension: str, create_empty: bool) -> None:
 	for test_path in test_paths:
@@ -266,29 +267,24 @@ def update_tests(template: ProgramTemplate, test_paths: list[str], record_file_e
 
 
 # Run each test, compare it to the corresponding record file, and return the results of each test.
-# program_path: str -- the path to the program to test.
+# template: ProgramTemplate -- the program template to execute.
 # test_paths: list[str] -- a list of test case file paths.
 # record_file_extension: str -- the file extension of record files.
 # return: list[TestResult] -- return the TestResult for each test.
-def run_tests(template: ProgramTemplate, test_paths: list[str], record_file_extension: str) -> list[TestResult]:
-	results = []
+def run_tests(template: ProgramTemplate, test_paths: list[str], record_file_extension: str) -> Generator[TestResult]:
 	for test_path in test_paths:
 		# find the record path and read the expected output
 		record_path = record_path_of(test_path, record_file_extension)
 		expected_output = read_record_of(record_path)
-		results.append(TestResult(
+		yield TestResult(
 			test_path, record_path, expected_output,
 			# if expected output is an error message, we skip the test and don't run the test case
 			None if isinstance(expected_output, str) else run_and_capture(template, test_path)
-		))
-	# return all of the results
-	return results
+		)
 
 
 # Print test failure information.
-# test_path: str -- the test case file path.
-# expected_output: bytes -- the expected test output.
-# actual_output: bytes -- the actual test output.
+# result: TestResult -- the result information for the failed test.
 # return: None.
 def print_failure(result: TestResult) -> None:
 	# TODO: print out where specifically it failed, and
@@ -307,27 +303,28 @@ def print_failure(result: TestResult) -> None:
 
 
 # Print test case results.
-# results: list of tuples of (test_case_path, expected_output, actual_output).
+# results: list[TestResult] -- the list of results for each test.
 # return: int -- the exit code of the program.
-def display_results(results: list[TestResult]) -> int:
+def display_results(results: Generator[TestResult]) -> int:
 	tests_passed = 0
-	total_tests = len(results)
+	total_tests = 0
 
 	for result in results:
 		print(f'TEST: \'{result.test_path}\'... ', end='')
 		# if result was skipped, ignore this case and adjust total tests accordingly
 		if result.skipped():
 			print(f'\033[38;5;{8}mSKIPPED, {result.expected_output}\033[0m')
-			total_tests -= 1
 		# if the test pass, print that and increase the number of successful tests
 		elif result.passed():
 			# TODO: better way of printing colors
 			print(f'\033[38;5;{2}mOK\033[0m')
 			tests_passed += 1
+			total_tests += 1
 		# if the test failed, print the difference between expected and actual
 		else:
 			print(f'\033[38;5;{9}mFAIL\033[0m')
 			print_failure(result)
+			total_tests += 1
 
 	print(f'{tests_passed}/{total_tests} tests passed')
 

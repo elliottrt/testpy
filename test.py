@@ -40,8 +40,6 @@ class TestCaseOutput:
 			TEST_CASE_OUTPUT_RETURNCODE: self.returncode
 		}
 
-	# TODO: to string or __str__ or __repr__
-
 
 # Exception information about executed test cases.
 class TestCaseException:
@@ -296,13 +294,6 @@ def run_tests(template: ProgramTemplate, test_paths: list[str], record_file_exte
 # result: TestResult -- the result information for the failed test.
 # return: None.
 def print_failure(result: TestResult) -> None:
-	# TODO: print out where specifically it failed, and
-	# a comparison between the two things like "...[text]... vs ...[bird]..."
-
-	# TODO: do we need to print out things that are equal?
-	# if stdout, retcode are equal but stderr, differs,
-	# should we only print stderr?
-
 	if isinstance(result.actual_output, TestCaseOutput):
 		# print out expected and actual for failed test cases
 		print(f"    EXPECTED: {result.expected_output}")

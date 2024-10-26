@@ -1,3 +1,4 @@
+#! python3
 
 # Ordered by length.
 import os
@@ -5,8 +6,8 @@ import sys
 import json
 import argparse
 import subprocess
-from typing import cast, Optional, Union, Any, Generator
 from dataclasses import dataclass
+from typing import cast, Optional, Union, Any, Generator
 
 
 TEST_CASE_OUTPUT_STDOUT = 'stdout'
@@ -106,6 +107,7 @@ class TestArguments(argparse.Namespace):
 	symbol: str
 	create_empty: bool
 	no_recursion: bool
+	fail_only: bool
 
 
 # Prints an error message.
@@ -310,26 +312,30 @@ def print_failure(result: TestResult) -> None:
 
 
 # Print test case results.
-# results: list[TestResult] -- the list of results for each test.
+# results: Generator[TestResult] -- the Generator of results for each test.
+# fail_only: bool -- if true, only display information about failing tests.
 # return: int -- the exit code of the program.
-def display_results(results: Generator[TestResult]) -> int:
+def display_results(results: Generator[TestResult], fail_only: bool) -> int:
 	tests_passed = 0
 	total_tests = 0
 
+	# TODO: better way of printing colors
+
 	for result in results:
-		print(f'TEST: \'{result.test_path}\'... ', end='')
-		# if result was skipped, ignore this case and adjust total tests accordingly
+		test_string = f'TEST: \'{result.test_path}\'... '
+		# if result was skipped, ignore this case
 		if result.skipped():
-			print(f'\033[38;5;{8}mSKIPPED, {result.expected_output}\033[0m')
-		# if the test pass, print that and increase the number of successful tests
+			if not fail_only:
+				print(test_string + f'\033[38;5;{8}mSKIPPED, {result.expected_output}\033[0m')
+		# if the test pass, print that and increase the number of successful tests and total tests
 		elif result.passed():
-			# TODO: better way of printing colors
-			print(f'\033[38;5;{2}mOK\033[0m')
+			if not fail_only:
+				print(test_string + f'\033[38;5;{2}mOK\033[0m')
 			tests_passed += 1
 			total_tests += 1
 		# if the test failed, print the difference between expected and actual
 		else:
-			print(f'\033[38;5;{9}mFAIL\033[0m')
+			print(test_string + f'\033[38;5;{9}mFAIL\033[0m')
 			print_failure(result)
 			total_tests += 1
 
@@ -380,6 +386,7 @@ def create_argparser(this_name: str) -> argparse.ArgumentParser:
 	args.add_argument('-s', '--symbol', default='@', type=str, help='symbol to replace with test case in command template, default=\'@\'')
 	args.add_argument('-c', '--create-empty', action='store_true', help='create empty record files for manual test case writing')
 	args.add_argument('-n', '--no-recursion', action='store_true', help='disable recursive search for test cases')
+	args.add_argument('-f', '--fail-only', action='store_true', help='only display information about failing tests')
 
 	return args
 
@@ -416,7 +423,7 @@ def do_tests(argv: list[str]) -> int:
 		# otherwise run the tests and return the exitcode display_results returns
 		else:
 			test_results = run_tests(program_template, tests_to_run, settings.record_ext)
-			return display_results(test_results)
+			return display_results(test_results, settings.fail_only)
 
 	# if the test directory didn't exist, print that error
 	else:

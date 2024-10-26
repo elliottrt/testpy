@@ -12,6 +12,8 @@ If the command requires more complexity, write out the command and replace all r
 
 Directories are, by default, recursively searched for test cases. This can be disabled with `-n` and `--no-recursion`
 
+Information about every test case and their status is printed. This includes passing, failing, and skipped tests. Tests are skipped if their record file is missing or malformed. To only print out failing tests, use the `-f` or `--fail-only` options.
+
 ### Updating Test Cases
 When run with the option `-u` or `--update`, all test cases will be evaluated and their results stored in record files for future test evaluations to check against.
 

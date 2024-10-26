@@ -1,0 +1,5 @@
+{
+    "stdout": "this test contains unicode data: \"\uffff\"", 
+    "stderr": "", 
+    "returncode": 0
+}

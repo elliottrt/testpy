@@ -1,0 +1,5 @@
+{
+    "stdout": "cat", 
+    "stderr": "fake data error", 
+    "returncode": 32
+}

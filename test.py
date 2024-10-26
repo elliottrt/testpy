@@ -9,10 +9,13 @@ from typing import cast, Optional, Union, Any
 from dataclasses import dataclass
 
 
-TEST_CASE_OUTPUT_ENCODING = 'utf-8'
 TEST_CASE_OUTPUT_STDOUT = 'stdout'
 TEST_CASE_OUTPUT_STDERR = 'stderr'
 TEST_CASE_OUTPUT_RETURNCODE = 'returncode'
+
+
+# TODO: review doc comments and make sure all of the types are right
+# TODO: put everything into one class that takes all of the options so this can be more easily used from other files
 
 
 # Dataclass containing test result information.
@@ -55,7 +58,7 @@ class TestCaseException:
 class TestResult:
 	test_path: str
 	record_path: str
-	expected_output: Optional[TestCaseOutput]
+	expected_output: Union[TestCaseOutput, str]
 	actual_output: Optional[Union[TestCaseOutput, TestCaseException]]
 
 	# Returns whether the test has passed or failed.
@@ -66,7 +69,7 @@ class TestResult:
 	# Returns whether this Test was skipped.
 	# return: bool -- true if this test was skipped, false otherwise.
 	def skipped(self) -> bool:
-		return self.actual_output is None
+		return isinstance(self.expected_output, str)
 
 
 # Class that contains and formats program invocations.
@@ -179,23 +182,37 @@ def record_path_of(test_path: str, record_file_extension: str) -> str:
 # Returns the bytes of a test case record file.
 # If the case cannot be found, returns None.
 # record_path: str -- the file path of the test case record.
-# return: Optiona[bytes] -- the bytes of a test case record file, or None if the record file path is invalid.
-def read_record_of(record_path: str) -> Optional[TestCaseOutput]:
+# return: Union[TestCaseOutput | str] -- the expected test case output, or error message if the record file path is invalid.
+def read_record_of(record_path: str) -> Union[TestCaseOutput | str]:
 	# return the bytes if the file exists
 	if is_valid_file(record_path):
 		with open(record_path, 'r') as record:
-			# TODO: types for this
-			js = json.load(record)
-			# TODO: make sure the data is in the right format and that the keys exist
-			# return some value that allows the tester to print out a new test case result: bad record
-			return TestCaseOutput(
-				js[TEST_CASE_OUTPUT_STDOUT],
-				js[TEST_CASE_OUTPUT_STDERR],
-				js[TEST_CASE_OUTPUT_RETURNCODE]
-			)
-	# otherwise return None
+			# TODO: types for record_json
+			record_json = {}
+			try:
+				record_json = json.load(record)
+			except json.decoder.JSONDecodeError:
+				return 'BAD RECORD'
+
+			# make sure it has all of the things we need
+			missing_vars = []
+			if TEST_CASE_OUTPUT_STDOUT not in record_json:
+				missing_vars.append(TEST_CASE_OUTPUT_STDOUT)
+			if TEST_CASE_OUTPUT_STDERR not in record_json:
+				missing_vars.append(TEST_CASE_OUTPUT_STDERR)
+			if TEST_CASE_OUTPUT_RETURNCODE not in record_json:
+				missing_vars.append(TEST_CASE_OUTPUT_RETURNCODE)
+
+			if len(missing_vars) == 0:
+				return TestCaseOutput(
+					record_json[TEST_CASE_OUTPUT_STDOUT],
+					record_json[TEST_CASE_OUTPUT_STDERR],
+					record_json[TEST_CASE_OUTPUT_RETURNCODE]
+				)
+			else:
+				return 'BAD RECORD'
 	else:
-		return None
+		return 'NO RECORD'
 
 
 # Writes bytes to a test case record file.
@@ -227,8 +244,8 @@ def run_and_capture(template: ProgramTemplate, test_path: str) -> Union[TestCase
 
 	return TestCaseOutput(
 		# convert the bytes to a utf-8 string for storage
-		str(process.stdout, encoding=TEST_CASE_OUTPUT_ENCODING),
-		str(process.stderr, encoding=TEST_CASE_OUTPUT_ENCODING),
+		str(process.stdout, encoding='utf-8'),
+		str(process.stderr, encoding='utf-8'),
 		process.returncode
 	)
 
@@ -268,8 +285,8 @@ def run_tests(template: ProgramTemplate, test_paths: list[str], record_file_exte
 		expected_output = read_record_of(record_path)
 		results.append(TestResult(
 			test_path, record_path, expected_output,
-			# if expected output is none, we skip the test and don't run the test case
-			None if expected_output is None else run_and_capture(template, test_path)
+			# if expected output is an error message, we skip the test and don't run the test case
+			None if isinstance(expected_output, str) else run_and_capture(template, test_path)
 		))
 	# return all of the results
 	return results
@@ -304,19 +321,19 @@ def display_results(results: list[TestResult]) -> int:
 	total_tests = len(results)
 
 	for result in results:
-		print(f'TEST: \'{result.test_path}\'', end='...')
+		print(f'TEST: \'{result.test_path}\'... ', end='')
 		# if result was skipped, ignore this case and adjust total tests accordingly
 		if result.skipped():
-			print(f'\033[38;5;{8}m{'SKIPPED, NO RECORD'}\033[0m')
+			print(f'\033[38;5;{8}mSKIPPED, {result.expected_output}\033[0m')
 			total_tests -= 1
 		# if the test pass, print that and increase the number of successful tests
 		elif result.passed():
 			# TODO: better way of printing colors
-			print(f'\033[38;5;{2}m{'OK'}\033[0m')
+			print(f'\033[38;5;{2}mOK\033[0m')
 			tests_passed += 1
 		# if the test failed, print the difference between expected and actual
 		else:
-			print(f'\033[38;5;{9}m{'FAIL'}\033[0m')
+			print(f'\033[38;5;{9}mFAIL\033[0m')
 			print_failure(result)
 
 	print(f'{tests_passed}/{total_tests} tests passed')
@@ -404,5 +421,7 @@ def do_tests(argv: list[str]) -> int:
 		return 1
 
 
+# TODO: ability to run single file test - if file specified instead of dir
+# TODO: recursive test directory search for test cases
 if __name__ == '__main__':
 	sys.exit(do_tests(sys.argv))

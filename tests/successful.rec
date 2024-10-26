@@ -1,0 +1,5 @@
+{
+    "stdout": "this test should succeed", 
+    "stderr": "", 
+    "returncode": 0
+}

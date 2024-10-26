@@ -10,6 +10,8 @@ The command that will be run for each test case can either be simple or complex.
 If the command can be written in the form `<command> <test case file>` then simply write `<command>`.
 If the command requires more complexity, write out the command and replace all references to the test file with a `@`, which will be replaced at runtime with the name of the test case file. This symbol can be changed with the `-s <symbol>` and `--symbol <symbol>` options.
 
+Directories are, by default, recursively searched for test cases. This can be disabled with `-n` and `--no-recursion`
+
 ### Updating Test Cases
 When run with the option `-u` or `--update`, all test cases will be evaluated and their results stored in record files for future test evaluations to check against.
 

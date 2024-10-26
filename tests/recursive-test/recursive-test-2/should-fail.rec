@@ -1,0 +1,5 @@
+{
+    "stdout": "this should fail", 
+    "stderr": "this fails because i made it fail", 
+    "returncode": 4
+}

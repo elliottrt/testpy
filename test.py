@@ -16,7 +16,6 @@ TEST_CASE_OUTPUT_RETURNCODE = 'returncode'
 
 # TODO: doc comments for all class functions
 # TODO: put everything into one class that takes all of the options so this can be more easily used from other files
-# TODO: convert things that return lists to generators with yield
 
 # Dataclass containing test result information.
 @dataclass
@@ -106,6 +105,7 @@ class TestArguments(argparse.Namespace):
 	program_template: str
 	symbol: str
 	create_empty: bool
+	no_recursion: bool
 
 
 # Prints an error message.
@@ -149,11 +149,18 @@ def is_valid_dir(path: str) -> bool:
 # record_file_extension: str -- the file extension of record files.
 # test_file_extension: Optional[str] -- an optional file extension to filter by.
 # return: Optional[list[str]] -- a list of test file paths, or None if test_path is not a valid file/directory.
-def get_tests(test_path: str, record_file_extension: str, test_file_extension: Optional[str]) -> Optional[list[str]]:
+def get_tests(test_path: str, record_file_extension: str, test_file_extension: Optional[str], recursive: bool) -> Optional[list[str]]:
 	# make sure the test directory is valid
 	if is_valid_dir(test_path):
 		# get all the items, and include the full paths from where this is executed
 		matches = [os.path.join(test_path, fn) for fn in os.listdir(test_path)]
+
+		if recursive:
+			child_dirs = [dp for dp in matches if is_valid_dir(dp)]
+			child_dir_matches = [get_tests(dp, record_file_extension, test_file_extension, recursive) for dp in child_dirs]
+			child_dir_matches_flat = [child for children in child_dir_matches if children is not None for child in children]
+		else:
+			child_dir_matches_flat = []
 
 		# make sure these are all files that exist, and are not record files
 		matches = [fp for fp in matches if is_valid_file(fp) and not fp.endswith(record_file_extension)]
@@ -163,7 +170,7 @@ def get_tests(test_path: str, record_file_extension: str, test_file_extension: O
 			matches = [fp for fp in matches if fp.endswith(test_file_extension)]
 
 		# sort them so tests are run in alphabetical order
-		return sorted(matches)
+		return sorted(matches + child_dir_matches_flat)
 	# if the directory wasn't valid, return None
 	elif is_valid_file(test_path):
 		return [test_path]
@@ -372,6 +379,7 @@ def create_argparser(this_name: str) -> argparse.ArgumentParser:
 	args.add_argument('-r', '--record-ext', default='rec', type=str, help='file extension of record cases, default=\'rec\'')
 	args.add_argument('-s', '--symbol', default='@', type=str, help='symbol to replace with test case in command template, default=\'@\'')
 	args.add_argument('-c', '--create-empty', action='store_true', help='create empty record files for manual test case writing')
+	args.add_argument('-n', '--no-recursion', action='store_true', help='disable recursive search for test cases')
 
 	return args
 
@@ -392,7 +400,12 @@ def do_tests(argv: list[str]) -> int:
 
 	# create program template and get all the tests to run
 	program_template = ProgramTemplate(settings.program_template, settings.symbol)
-	tests_to_run = get_tests(settings.test_case, settings.record_ext, settings.test_ext)
+	tests_to_run = get_tests(
+		settings.test_case,
+		settings.record_ext,
+		settings.test_ext,
+		recursive=not settings.no_recursion
+	)
 
 	# make sure the test directory exists
 	if tests_to_run is not None:
@@ -411,6 +424,6 @@ def do_tests(argv: list[str]) -> int:
 		return 1
 
 
-# TODO: recursive test directory search for test cases
+# option to not print out passing tests - as in, don't print out TEST '{name}'... {status} if passing
 if __name__ == '__main__':
 	sys.exit(do_tests(sys.argv))

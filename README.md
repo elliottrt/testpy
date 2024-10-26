@@ -1,8 +1,8 @@
 # test.py
-test.py is a basic test runner. It collects all test files in a given directory and evaluates them using the provided command, then displays this information to the user. It also provides the ability to evaluate the test cases and store their results for future testing.
+test.py is a basic test runner. It collects a single test case or all test files in a given directory and evaluates them using the provided command, then displays this information to the user. It also provides the ability to evaluate the test cases and store their results for future testing.
 
 ## Usage
-`./test.py <program command> <test case directory> [options]`
+`./test.py <program command> <test case or test case directory> [options]`
 
 ## Options
 ### Test Case Command

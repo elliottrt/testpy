@@ -40,6 +40,8 @@ class TestCaseOutput:
 			TEST_CASE_OUTPUT_RETURNCODE: self.returncode
 		}
 
+	# TODO: to string or __str__ or __repr__
+
 
 # Exception information about executed test cases.
 class TestCaseException:
@@ -99,7 +101,7 @@ class ProgramTemplate:
 class TestArguments(argparse.Namespace):
 	test_ext: str
 	record_ext: str
-	test_dir: str
+	test_case: str
 	update: bool
 	program_template: str
 	symbol: str
@@ -143,16 +145,15 @@ def is_valid_dir(path: str) -> bool:
 
 
 # Returns a list of paths representing all test cases in the test directory matching an optional file extension.
-# test_dir_path: str -- the path to the directory containing the test cases.
+# test_path: str -- the path to a single test or a directory containing test cases.
 # record_file_extension: str -- the file extension of record files.
 # test_file_extension: Optional[str] -- an optional file extension to filter by.
-# return: Optional[list[str]] -- a list of test file paths, or None if test_dir_path is not a valid directory.
-def get_tests(test_dir_path: str, record_file_extension: str, test_file_extension: Optional[str]) -> Optional[list[str]]:
+# return: Optional[list[str]] -- a list of test file paths, or None if test_path is not a valid file/directory.
+def get_tests(test_path: str, record_file_extension: str, test_file_extension: Optional[str]) -> Optional[list[str]]:
 	# make sure the test directory is valid
-	if is_valid_dir(test_dir_path):
-
+	if is_valid_dir(test_path):
 		# get all the items, and include the full paths from where this is executed
-		matches = [os.path.join(test_dir_path, fn) for fn in os.listdir(test_dir_path)]
+		matches = [os.path.join(test_path, fn) for fn in os.listdir(test_path)]
 
 		# make sure these are all files that exist, and are not record files
 		matches = [fp for fp in matches if is_valid_file(fp) and not fp.endswith(record_file_extension)]
@@ -164,6 +165,8 @@ def get_tests(test_dir_path: str, record_file_extension: str, test_file_extensio
 		# sort them so tests are run in alphabetical order
 		return sorted(matches)
 	# if the directory wasn't valid, return None
+	elif is_valid_file(test_path):
+		return [test_path]
 	else:
 		return None
 
@@ -365,10 +368,10 @@ def create_argparser(this_name: str) -> argparse.ArgumentParser:
 	)
 
 	args.add_argument('program_template', help='program template to run')
-	args.add_argument('test_dir', help='directory containing test cases')
+	args.add_argument('test_case', help='test case or directory of test cases')
 
 	args.add_argument('-u', '--update', action='store_true', help='updates test cases if set')
-	args.add_argument('-e', '--test-ext', default=None, type=str, help='file extension of test cases')
+	args.add_argument('-e', '--test-ext', default=None, type=str, help='file extension of test cases. ignored if the test case is a single file')
 	args.add_argument('-r', '--record-ext', default='rec', type=str, help='file extension of record cases, default=\'rec\'')
 	args.add_argument('-s', '--symbol', default='@', type=str, help='symbol to replace with test case in command template, default=\'@\'')
 	args.add_argument('-c', '--create-empty', action='store_true', help='create empty record files for manual test case writing')
@@ -392,7 +395,7 @@ def do_tests(argv: list[str]) -> int:
 
 	# create program template and get all the tests to run
 	program_template = ProgramTemplate(settings.program_template, settings.symbol)
-	tests_to_run = get_tests(settings.test_dir, settings.record_ext, settings.test_ext)
+	tests_to_run = get_tests(settings.test_case, settings.record_ext, settings.test_ext)
 
 	# make sure the test directory exists
 	if tests_to_run is not None:
@@ -407,11 +410,10 @@ def do_tests(argv: list[str]) -> int:
 
 	# if the test directory didn't exist, print that error
 	else:
-		print_error(f'directory \'{settings.test_dir}\' does not exist or is not a directory')
+		print_error(f'directory \'{settings.test_case}\' does not exist or is not a file or directory')
 		return 1
 
 
-# TODO: ability to run single file test - if file specified instead of dir
 # TODO: recursive test directory search for test cases
 if __name__ == '__main__':
 	sys.exit(do_tests(sys.argv))

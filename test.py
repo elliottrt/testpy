@@ -187,30 +187,20 @@ def read_record_of(record_path: str) -> Union[TestCaseOutput | str]:
 	# return the bytes if the file exists
 	if is_valid_file(record_path):
 		with open(record_path, 'r') as record:
-			# TODO: types for record_json
-			record_json = {}
 			try:
-				record_json = json.load(record)
-			except json.decoder.JSONDecodeError:
-				return 'BAD RECORD'
+				record_json: dict[str, Union[str, int]] = json.load(record)
 
-			# make sure it has all of the things we need
-			missing_vars = []
-			if TEST_CASE_OUTPUT_STDOUT not in record_json:
-				missing_vars.append(TEST_CASE_OUTPUT_STDOUT)
-			if TEST_CASE_OUTPUT_STDERR not in record_json:
-				missing_vars.append(TEST_CASE_OUTPUT_STDERR)
-			if TEST_CASE_OUTPUT_RETURNCODE not in record_json:
-				missing_vars.append(TEST_CASE_OUTPUT_RETURNCODE)
+				stdout = record_json[TEST_CASE_OUTPUT_STDOUT]
+				stderr = record_json[TEST_CASE_OUTPUT_STDERR]
+				returncode = record_json[TEST_CASE_OUTPUT_RETURNCODE]
 
-			if len(missing_vars) == 0:
-				return TestCaseOutput(
-					record_json[TEST_CASE_OUTPUT_STDOUT],
-					record_json[TEST_CASE_OUTPUT_STDERR],
-					record_json[TEST_CASE_OUTPUT_RETURNCODE]
-				)
-			else:
-				return 'BAD RECORD'
+				if isinstance(stdout, str) and isinstance(stderr, str) and isinstance(returncode, int):
+					return TestCaseOutput(stdout, stderr, returncode)
+			except Exception:
+				pass
+
+			# error if the if statement fails or the json doesn't contain the right info
+			return 'BAD RECORD'
 	else:
 		return 'NO RECORD'
 

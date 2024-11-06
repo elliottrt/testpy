@@ -1,0 +1,5 @@
+{
+    "stdout": "TEST: 'example-tests/failing.txt'... \u001b[38;5;9mFAIL\u001b[0m\n    EXPECTED: TestCaseOutput(stdout='cat', stderr='fake data error', returncode=32)\n    ACTUAL:   TestCaseOutput(stdout='this test should fail', stderr='', returncode=0)\n0/1 tests passed\n", 
+    "stderr": "", 
+    "returncode": 1
+}

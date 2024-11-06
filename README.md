@@ -4,6 +4,11 @@ test.py is a basic test runner. It collects a single test case or all test files
 ## Usage
 `./test.py <program command> <test case or test case directory> [options]`
 
+## Quickstart
+`./test.py sh tests`
+
+Will run the shell scripts in tests. These call test.py on the example-tests to ensure they work as expected.
+
 ## Options
 ### Test Case Command
 The command that will be run for each test case can either be simple or complex.

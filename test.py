@@ -10,11 +10,6 @@ from dataclasses import dataclass
 from typing import cast, Optional, Union, Any, Generator
 
 
-TEST_CASE_OUTPUT_STDOUT = 'stdout'
-TEST_CASE_OUTPUT_STDERR = 'stderr'
-TEST_CASE_OUTPUT_RETURNCODE = 'returncode'
-
-
 # TODO: doc comments for all class functions
 # TODO: put everything into one class that takes all of the options so this can be more easily used from other files
 
@@ -35,9 +30,9 @@ class TestCaseOutput:
 
 	def to_json(self) -> dict[str, Union[str, int]]:
 		return {
-			TEST_CASE_OUTPUT_STDOUT: self.stdout,
-			TEST_CASE_OUTPUT_STDERR: self.stderr,
-			TEST_CASE_OUTPUT_RETURNCODE: self.returncode
+			'stdout': self.stdout,
+			'stderr': self.stderr,
+			'returncode': self.returncode
 		}
 
 
@@ -200,9 +195,9 @@ def read_record_of(record_path: str) -> Union[TestCaseOutput, str]:
 			try:
 				record_json: dict[str, Union[str, int]] = json.load(record)
 
-				stdout = record_json[TEST_CASE_OUTPUT_STDOUT]
-				stderr = record_json[TEST_CASE_OUTPUT_STDERR]
-				returncode = record_json[TEST_CASE_OUTPUT_RETURNCODE]
+				stdout = record_json['stdout']
+				stderr = record_json['stderr']
+				returncode = record_json['returncode']
 
 				if isinstance(stdout, str) and isinstance(stderr, str) and isinstance(returncode, int):
 					return TestCaseOutput(stdout, stderr, returncode)
@@ -238,7 +233,7 @@ def run_and_capture(template: ProgramTemplate, test_path: str) -> Union[TestCase
 	test_command = template.format(test_path)
 
 	try:
-		process = subprocess.run(test_command.split(' '), capture_output=True)
+		process = subprocess.run(test_command, capture_output=True, shell=True)
 	except Exception as excp:
 		return TestCaseException(test_command, excp)
 
@@ -310,7 +305,7 @@ def display_results(results: Generator[TestResult], fail_only: bool) -> int:
 	tests_passed = 0
 	total_tests = 0
 
-	# TODO: better way of printing colors
+	# TODO: better way of printing colors - or remove colors entirely
 
 	for result in results:
 		test_string = f'TEST: \'{result.test_path}\'... '

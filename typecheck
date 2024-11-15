@@ -2,4 +2,4 @@ mypy test.py \
  --disallow-any-generics --disallow-subclassing-any --disallow-untyped-calls \
  --disallow-untyped-defs --disallow-incomplete-defs --warn-redundant-casts \
  --warn-unused-ignores --warn-return-any --warn-unreachable --disallow-any-decorated \
- --strict-equality --extra-checks --show-column-numbers --pretty
+ --strict-equality --extra-checks --show-column-numbers --pretty --strict

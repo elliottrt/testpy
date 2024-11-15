@@ -226,11 +226,15 @@ def write_record_of(record_path: str, output: TestCaseOutput) -> None:
 
 # Runs the program that is being tested with the test case file.
 # template: ProgramTemplate -- the program template to execute.
-# test_case_path: str -- the path to the test case file.
+# test_path: str -- the path to the test case file.
+# echo: bool -- whether to echo the commands that are executed.
 # return: Union[TestCaseOutput, TestCaseException] -- the expected test case output or an exception if one occurred.
-def run_and_capture(template: ProgramTemplate, test_path: str) -> Union[TestCaseOutput, TestCaseException]:
+def run_and_capture(template: ProgramTemplate, test_path: str, echo: bool) -> Union[TestCaseOutput, TestCaseException]:
 	# format the test case command and split it for subprocess
 	test_command = template.format(test_path)
+
+	if echo:
+		print(f'CMD: \'{test_command}\'')
 
 	try:
 		process = subprocess.run(test_command, capture_output=True, shell=True)
@@ -250,8 +254,9 @@ def run_and_capture(template: ProgramTemplate, test_path: str) -> Union[TestCase
 # test_paths: list[str] -- a list of test case file paths.
 # record_file_extension: str -- the file extension of record files.
 # create_empty: bool -- if set, creates empty test case files for manual editing.
+# echo: bool -- whether to echo the commands that are executed.
 # return: None.
-def update_tests(template: ProgramTemplate, test_paths: list[str], record_file_extension: str, create_empty: bool) -> None:
+def update_tests(template: ProgramTemplate, test_paths: list[str], record_file_extension: str, create_empty: bool, echo: bool) -> None:
 	for test_path in test_paths:
 		# find the record it belongs to
 		record_path = record_path_of(test_path, record_file_extension)
@@ -260,7 +265,7 @@ def update_tests(template: ProgramTemplate, test_paths: list[str], record_file_e
 			write_record_of(record_path, TestCaseOutput('', '', 0))
 		else:
 			# get the output from the test case
-			actual_output = run_and_capture(template, test_path)
+			actual_output = run_and_capture(template, test_path, echo)
 			# update the record with the new output
 			if isinstance(actual_output, TestCaseOutput):
 				write_record_of(record_path, actual_output)
@@ -272,8 +277,9 @@ def update_tests(template: ProgramTemplate, test_paths: list[str], record_file_e
 # template: ProgramTemplate -- the program template to execute.
 # test_paths: list[str] -- a list of test case file paths.
 # record_file_extension: str -- the file extension of record files.
+# echo: bool -- whether to echo the commands that are executed.
 # return: list[TestResult] -- return the TestResult for each test.
-def run_tests(template: ProgramTemplate, test_paths: list[str], record_file_extension: str) -> Generator[TestResult]:
+def run_tests(template: ProgramTemplate, test_paths: list[str], record_file_extension: str, echo: bool) -> Generator[TestResult]:
 	for test_path in test_paths:
 		# find the record path and read the expected output
 		record_path = record_path_of(test_path, record_file_extension)
@@ -281,7 +287,7 @@ def run_tests(template: ProgramTemplate, test_paths: list[str], record_file_exte
 		yield TestResult(
 			test_path, record_path, expected_output,
 			# if expected output is an error message, we skip the test and don't run the test case
-			None if isinstance(expected_output, str) else run_and_capture(template, test_path)
+			None if isinstance(expected_output, str) else run_and_capture(template, test_path, echo)
 		)
 
 
@@ -300,28 +306,37 @@ def print_failure(result: TestResult) -> None:
 # Print test case results.
 # results: Generator[TestResult] -- the Generator of results for each test.
 # fail_only: bool -- if true, only display information about failing tests.
+# color_text: bool -- whether to display colored text in results
 # return: int -- the exit code of the program.
-def display_results(results: Generator[TestResult], fail_only: bool) -> int:
+def display_results(results: Generator[TestResult], fail_only: bool, color_text: bool) -> int:
 	tests_passed = 0
 	total_tests = 0
 
-	# TODO: better way of printing colors - or remove colors entirely
-
+	# TODO: better way of printing colors - 'rich' library?
 	for result in results:
 		test_string = f'TEST: \'{result.test_path}\'... '
 		# if result was skipped, ignore this case
 		if result.skipped():
 			if not fail_only:
-				print(test_string + f'\033[38;5;{8}mSKIPPED, {result.expected_output}\033[0m')
+				if color_text:
+					print(test_string + f'\033[38;5;{8}mSKIPPED, {result.expected_output}\033[0m')
+				else:
+					print(test_string + 'SKIPPED, ' + str(result.expected_output))
 		# if the test pass, print that and increase the number of successful tests and total tests
 		elif result.passed():
 			if not fail_only:
-				print(test_string + f'\033[38;5;{2}mOK\033[0m')
+				if color_text:
+					print(test_string + f'\033[38;5;{2}mOK\033[0m')
+				else:
+					print(test_string + 'OK')
 			tests_passed += 1
 			total_tests += 1
 		# if the test failed, print the difference between expected and actual
 		else:
-			print(test_string + f'\033[38;5;{9}mFAIL\033[0m')
+			if color_text:
+				print(test_string + f'\033[38;5;{9}mFAIL\033[0m')
+			else:
+				print(test_string + 'FAIL')
 			print_failure(result)
 			total_tests += 1
 
@@ -367,16 +382,19 @@ def create_argparser(this_name: str) -> argparse.ArgumentParser:
 	args.add_argument('test_case', help='test case or directory of test cases')
 
 	args.add_argument('-u', '--update', action='store_true', help='updates test cases if set')
-	args.add_argument('-e', '--test-ext', default=None, type=str, help='file extension of test cases. ignored if the test case is a single file')
+	args.add_argument('-t', '--test-ext', default=None, type=str, help='file extension of test cases. ignored if the test case is a single file')
 	args.add_argument('-r', '--record-ext', default='rec', type=str, help='file extension of record cases, default=\'rec\'')
 	args.add_argument('-s', '--symbol', default='@', type=str, help='symbol to replace with test case in command template, default=\'@\'')
 	args.add_argument('-c', '--create-empty', action='store_true', help='create empty record files for manual test case writing')
 	args.add_argument('-n', '--no-recursion', action='store_true', help='disable recursive search for test cases')
 	args.add_argument('-f', '--fail-only', action='store_true', help='only display information about failing tests')
+	args.add_argument('-o', '--no-color', action='store_true', help='do not print colored text when displaying test case results')
+	args.add_argument('-e', '--echo', action='store_true', help='echo commands that are used to test the test cases')
 
 	return args
 
 
+# TODO: option to echo commands that are run
 # Main driver function, parses command line arguments and either runs or records tests.
 # argv: list[str] -- command line arguments.
 # return: int -- the exit code of the program.
@@ -404,12 +422,12 @@ def do_tests(argv: list[str]) -> int:
 	if tests_to_run is not None:
 		# if we need to update the tests, do that
 		if settings.update or settings.create_empty:
-			update_tests(program_template, tests_to_run, settings.record_ext, settings.create_empty)
+			update_tests(program_template, tests_to_run, settings.record_ext, settings.create_empty, settings.echo)
 			return 0
 		# otherwise run the tests and return the exitcode display_results returns
 		else:
-			test_results = run_tests(program_template, tests_to_run, settings.record_ext)
-			return display_results(test_results, settings.fail_only)
+			test_results = run_tests(program_template, tests_to_run, settings.record_ext, settings.echo)
+			return display_results(test_results, settings.fail_only, not settings.no_color)
 
 	# if the test directory didn't exist, print that error
 	else:

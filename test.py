@@ -394,7 +394,6 @@ def create_argparser(this_name: str) -> argparse.ArgumentParser:
 	return args
 
 
-# TODO: option to echo commands that are run
 # Main driver function, parses command line arguments and either runs or records tests.
 # argv: list[str] -- command line arguments.
 # return: int -- the exit code of the program.

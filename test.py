@@ -10,7 +10,12 @@ from dataclasses import dataclass
 from typing import cast, Optional, Union, Any, Generator
 
 
-# TODO: doc comments for all class functions
+__version_info__ = ('1', '0', '0')
+__version__ = '.'.join(__version_info__)
+
+
+# TODO: docstrings instead of comments above the functions
+# TODO: docstrings for all class functions
 # TODO: put everything into one class that takes all of the options so this can be more easily used from other files
 
 # Dataclass containing test result information.
@@ -358,9 +363,8 @@ def extensions_equal(ext_a: str, ext_b: str) -> bool:
 
 
 # Create the ArgumentParser for this program.
-# this_name: str -- the name of this python file.
 # return: ArgumentParser -- the argument parser for this program.
-def create_argparser(this_name: str) -> argparse.ArgumentParser:
+def create_argparser() -> argparse.ArgumentParser:
 
 	PROGRAM_TEMPLATE_EXPLANATION = """
 	The program_template argument describes what command to run for each test. This may be a single executable, or a more complex command.
@@ -372,7 +376,7 @@ def create_argparser(this_name: str) -> argparse.ArgumentParser:
 
 	# create argparser
 	args = argparse.ArgumentParser(
-		prog=this_name,
+		prog='test.py',
 		description='A basic test runner utility.',
 		epilog=PROGRAM_TEMPLATE_EXPLANATION,
 		argument_default=None
@@ -390,6 +394,7 @@ def create_argparser(this_name: str) -> argparse.ArgumentParser:
 	args.add_argument('-f', '--fail-only', action='store_true', help='only display information about failing tests')
 	args.add_argument('-o', '--no-color', action='store_true', help='do not print colored text when displaying test case results')
 	args.add_argument('-e', '--echo', action='store_true', help='echo commands that are used to test the test cases')
+	args.add_argument('-v', '--version', action='version', version='%(prog)s ' + __version__)
 
 	return args
 
@@ -399,10 +404,10 @@ def create_argparser(this_name: str) -> argparse.ArgumentParser:
 # return: int -- the exit code of the program.
 def do_tests(argv: list[str]) -> int:
 	# create the ArgumentParser
-	argparser = create_argparser(argv[0])
+	argparser = create_argparser()
 
 	# for some reason, argparse assumes the first element isn't the program name
-	settings = cast(TestArguments, argparser.parse_args(argv[1:]))
+	settings = cast(TestArguments, argparser.parse_args(argv))
 
 	# make sure the test file extension and the record file extension aren't equal
 	if settings.test_ext is not None and extensions_equal(settings.test_ext, settings.record_ext):
@@ -436,4 +441,4 @@ def do_tests(argv: list[str]) -> int:
 
 # option to not print out passing tests - as in, don't print out TEST '{name}'... {status} if passing
 if __name__ == '__main__':
-	sys.exit(do_tests(sys.argv))
+	sys.exit(do_tests(sys.argv[1:]))

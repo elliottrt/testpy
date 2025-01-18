@@ -10,13 +10,14 @@ from dataclasses import dataclass
 from typing import cast, Optional, Union, Any, Generator
 
 
-__version_info__ = ('1', '0', '0')
+__version_info__ = ('1', '0', '1')
 __version__ = '.'.join(__version_info__)
 
 
 # TODO: docstrings instead of comments above the functions
 # TODO: docstrings for all class functions
 # TODO: put everything into one class that takes all of the options so this can be more easily used from other files
+# TODO: better fail messages - just printing TestCaseOutput is hard to understand
 
 # Dataclass containing test result information.
 @dataclass
@@ -239,7 +240,7 @@ def run_and_capture(template: ProgramTemplate, test_path: str, echo: bool) -> Un
 	test_command = template.format(test_path)
 
 	if echo:
-		print(f'CMD: \'{test_command}\'')
+		print(f'CMD: {test_command}')
 
 	try:
 		process = subprocess.run(test_command, capture_output=True, shell=True)
@@ -383,7 +384,7 @@ def create_argparser() -> argparse.ArgumentParser:
 	)
 
 	args.add_argument('program_template', help='program template to run')
-	args.add_argument('test_case', help='test case or directory of test cases')
+	args.add_argument('test_case', nargs='+', help='one or more test cases or directories containing test cases')
 
 	args.add_argument('-u', '--update', action='store_true', help='updates test cases if set')
 	args.add_argument('-t', '--test-ext', default=None, type=str, help='file extension of test cases. ignored if the test case is a single file')
@@ -415,30 +416,36 @@ def do_tests(argv: list[str]) -> int:
 
 	# create program template and get all the tests to run
 	program_template = ProgramTemplate(settings.program_template, settings.symbol)
-	tests_to_run = get_tests(
-		settings.test_case,
+
+	tests_to_run = {case: get_tests(
+		case,
 		settings.record_ext,
 		settings.test_ext,
 		recursive=not settings.no_recursion
-	)
+	) for case in settings.test_case}
 
-	# make sure the test directory exists
-	if tests_to_run is not None:
-		# if we need to update the tests, do that
-		if settings.update or settings.create_empty:
-			update_tests(program_template, tests_to_run, settings.record_ext, settings.create_empty, settings.echo)
-			return 0
-		# otherwise run the tests and return the exitcode display_results returns
-		else:
-			test_results = run_tests(program_template, tests_to_run, settings.record_ext, settings.echo)
-			return display_results(test_results, settings.fail_only, not settings.no_color)
-
-	# if the test directory didn't exist, print that error
-	else:
-		print_error(f'directory \'{settings.test_case}\' does not exist or is not a file or directory')
+	# if one or more test paths didn't exist, print that error
+	invalid_paths = [k for k, v in tests_to_run.items() if v is None]
+	if len(invalid_paths) > 0:
+		for invalid_path in invalid_paths:
+			print_error(f'path \'{invalid_path}\' does not exist or is not a file or directory')
 		return 1
 
+	flattened_test_list = [
+		test_case
+		for path, test_list in tests_to_run.items() if test_list is not None
+		for test_case in test_list
+	]
 
-# option to not print out passing tests - as in, don't print out TEST '{name}'... {status} if passing
+	# if we need to update the tests, do that
+	if settings.update or settings.create_empty:
+		update_tests(program_template, flattened_test_list, settings.record_ext, settings.create_empty, settings.echo)
+		return 0
+	# otherwise run the tests and return the exitcode display_results returns
+	else:
+		test_results = run_tests(program_template, flattened_test_list, settings.record_ext, settings.echo)
+		return display_results(test_results, settings.fail_only, not settings.no_color)
+
+
 if __name__ == '__main__':
 	sys.exit(do_tests(sys.argv[1:]))

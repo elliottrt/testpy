@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import cast, Optional, Union, Any, Generator
 
 
-__version_info__ = ('1', '0', '1')
+__version_info__ = ('1', '0', '2')
 __version__ = '.'.join(__version_info__)
 
 
@@ -41,6 +41,9 @@ class TestCaseOutput:
 			'returncode': self.returncode
 		}
 
+	def __str__(self) -> str:
+		return f'returncode={self.returncode}, stdout=\'{self.stdout}\', stderr=\'{self.stderr}\''
+
 
 # Exception information about executed test cases.
 class TestCaseException:
@@ -51,7 +54,7 @@ class TestCaseException:
 	# Returns the description of what caused this exception.
 	# return: str -- the description of what caused this exception.
 	def error_string(self) -> str:
-		return f'Exception executing command "{self.command}": {self.exception}'
+		return f'Exception executing command \'{self.command}\': {self.exception}'
 
 
 # Dataclass containing information about test results.
@@ -303,10 +306,10 @@ def run_tests(template: ProgramTemplate, test_paths: list[str], record_file_exte
 def print_failure(result: TestResult) -> None:
 	if isinstance(result.actual_output, TestCaseOutput):
 		# print out expected and actual for failed test cases
-		print(f"    EXPECTED: {result.expected_output}")
-		print(f"    ACTUAL:   {result.actual_output}")
+		print(f'    EXPECTED: {result.expected_output}')
+		print(f'    ACTUAL:   {result.actual_output}')
 	elif isinstance(result.actual_output, TestCaseException):
-		print(f"    ERROR: {result.actual_output.error_string()}")
+		print(f'    ERROR: {result.actual_output.error_string()}')
 
 
 # Print test case results.
@@ -367,13 +370,13 @@ def extensions_equal(ext_a: str, ext_b: str) -> bool:
 # return: ArgumentParser -- the argument parser for this program.
 def create_argparser() -> argparse.ArgumentParser:
 
-	PROGRAM_TEMPLATE_EXPLANATION = """
+	PROGRAM_TEMPLATE_EXPLANATION = '''
 	The program_template argument describes what command to run for each test. This may be a single executable, or a more complex command.
-	For a simple executable, the test file path is appended to the end of the command, like "<executable> <test file path>".
-	If the desired command is more complex, quotes ("") should be used around the command and a symbol may be use which is replaced with
+	For a simple executable, the test file path is appended to the end of the command, like '<executable> <test file path>'.
+	If the desired command is more complex, quotes ("", '') should be used around the command and a symbol may be use which is replaced with
 	the name of the test case file for each test case. This can be set with the '-s' and '--symbol' arguments. If not set, the default is used.
-	For example, "python @ 1 2 3" will run each test case with '@' replaced with the test case file path.
-	"""
+	For example, 'python @ 1 2 3' will run each test case with '@' replaced with the test case file path.
+	'''
 
 	# create argparser
 	args = argparse.ArgumentParser(

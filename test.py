@@ -41,9 +41,6 @@ class TestCaseOutput:
 			'returncode': self.returncode
 		}
 
-	def __str__(self) -> str:
-		return f'returncode={self.returncode}, stdout=\'{self.stdout}\', stderr=\'{self.stderr}\''
-
 
 # Exception information about executed test cases.
 class TestCaseException:

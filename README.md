@@ -8,13 +8,13 @@ test.py uses direct shell calls. It is entirely possible for a malicious command
 
 ## Usage
 
-`./test.py <program command> <test case or test case directory> [options]`
+`./test.py <program command> <one ore more test cases or test case directories> [options]`
 
 ## Quickstart
 
 `./test.py sh tests`
 
-Will run the shell scripts in tests. These call test.py on the example-tests to ensure they work as expected.
+Will run the shell scripts in tests. These call test.py on the example-tests to verify they work as expected.
 
 ## Options
 

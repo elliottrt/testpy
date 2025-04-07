@@ -16,7 +16,6 @@ __version__ = '%d.%d.%d' % __version_info__
 '''
 TODO: actual docstrings for all functions, class methods included
 TODO: better fail messages - just printing TestCaseOutput is hard to understand
-TODO: should fail_only and echo work together -> echo only printed on failing?
 TODO: see if print_error is really needed
 TODO: option to time test cases and overall
 '''
@@ -28,6 +27,7 @@ class TestCaseOutput:
     stdout: str
     stderr: str
     returncode: int
+    command: Optional[str]
 
     def __eq__(self, value: Any) -> bool:
         if isinstance(value, TestCaseOutput):
@@ -43,6 +43,10 @@ class TestCaseOutput:
             'stderr': self.stderr,
             'returncode': self.returncode
         }
+
+    def __str__(self) -> str:
+        return f'TestCaseOutput(stdout=\'{self.stdout}\', ' + \
+            f'stderr=\'{self.stderr}\', returncode={self.returncode})'
 
 
 # Exception information about executed test cases.
@@ -152,7 +156,10 @@ def get_tests(
         # get all items and include full paths from where this is executed
 
         try:
-            matches = [os.path.join(test_path, fn) for fn in os.listdir(test_path)]
+            matches = [
+                os.path.join(test_path, fn)
+                for fn in os.listdir(test_path)
+            ]
         except PermissionError as e:
             print_error(f'cannot access {test_path}: {e.strerror}')
             exit(1)
@@ -232,7 +239,7 @@ def read_record_of(record_path: str) -> Union[TestCaseOutput, str]:
                 if isinstance(stdout, str) and \
                     isinstance(stderr, str) and \
                         isinstance(returncode, int):
-                    return TestCaseOutput(stdout, stderr, returncode)
+                    return TestCaseOutput(stdout, stderr, returncode, None)
         except PermissionError as e:
             print_error(f'cannot access {record_path}: {e.strerror}')
             exit(1)
@@ -262,18 +269,13 @@ def write_record_of(record_path: str, output: TestCaseOutput) -> None:
 # Runs the program that is being tested with the test case file.
 # template: ProgramTemplate -- the program template to execute.
 # test_path: str -- the path to the test case file.
-# echo: bool -- whether to echo the commands that are executed.
 # return: Union[TestCaseOutput, TestCaseException] -- the expected test case
 #       output or an exception if one occurred.
 def run_and_capture(
         template: ProgramTemplate,
-        test_path: str,
-        echo: bool) -> Union[TestCaseOutput, TestCaseException]:
+        test_path: str) -> Union[TestCaseOutput, TestCaseException]:
     # format the test case command and split it for subprocess
     test_command = template.format(test_path)
-
-    if echo:
-        print(f'CMD: {test_command}')
 
     try:
         process = subprocess.run(test_command, capture_output=True, shell=True)
@@ -284,7 +286,8 @@ def run_and_capture(
         # convert the bytes to a utf-8 string for storage
         str(process.stdout, encoding='utf-8'),
         str(process.stderr, encoding='utf-8'),
-        process.returncode
+        process.returncode,
+        test_command
     )
 
 
@@ -307,12 +310,16 @@ def update_tests(
         record_path = record_path_of(test_path, record_file_extension)
         if create_empty:
             # write an empty test case if requested
-            write_record_of(record_path, TestCaseOutput('', '', 0))
+            write_record_of(record_path, TestCaseOutput('', '', 0, None))
         else:
             # get the output from the test case
-            actual_output = run_and_capture(template, test_path, echo)
+            actual_output = run_and_capture(template, test_path)
             # update the record with the new output
             if isinstance(actual_output, TestCaseOutput):
+
+                if echo:
+                    print(f'CMD: {actual_output.command}')
+
                 write_record_of(record_path, actual_output)
             else:
                 print_error(actual_output.error_string())
@@ -323,12 +330,11 @@ def update_tests(
 # template: ProgramTemplate -- the program template to execute.
 # test_paths: list[str] -- a list of test case file paths.
 # record_file_extension: str -- the file extension of record files.
-# echo: bool -- whether to echo the commands that are executed.
 # return: list[TestResult] -- return the TestResult for each test.
 def run_tests(
         template: ProgramTemplate,
         test_paths: list[str],
-        record_file_extension: str, echo: bool) -> Generator[TestResult, None, None]:
+        record_file_extension: str) -> Generator[TestResult, None, None]:
 
     for test_path in test_paths:
         # find the record path and read the expected output
@@ -339,7 +345,7 @@ def run_tests(
             # if expected output is an error message, skip the test
             # and don't run the test case
             None if isinstance(expected_output, str)
-            else run_and_capture(template, test_path, echo)
+            else run_and_capture(template, test_path)
         )
 
 
@@ -356,20 +362,26 @@ def print_failure(result: TestResult) -> None:
 
 
 # Print test case results.
-# results: Generator[TestResult, None, None] -- the Generator of results for each test.
+# results: Generator[TestResult, None, None] -- Generator of results for tests.
 # fail_only: bool -- if true, only display information about failing tests.
 # color_text: bool -- whether to display colored text in results
+# echo: bool -- whether to echo the command used to test
 # return: int -- the exit code of the program.
 def display_results(
         results: Generator[TestResult, None, None],
         fail_only: bool,
-        use_color: bool) -> int:
+        use_color: bool,
+        echo: bool) -> int:
 
     tests_passed = 0
     total_tests = 0
 
-    # TODO: better way of printing colors - 'rich' library?
     for result in results:
+
+        if echo and isinstance(result.actual_output, TestCaseOutput) and \
+                not (fail_only and result.passed()):
+            print(f'CMD: {result.actual_output.command}')
+
         test_string = f'TEST: \'{result.test_path}\'... '
         # if result was skipped, ignore this case
         if result.skipped():
@@ -556,14 +568,14 @@ def do_tests(argv: list[str]) -> int:
         test_results = run_tests(
             program_template,
             flattened_test_list,
-            settings.record_ext,
-            settings.echo
+            settings.record_ext
         )
 
         return display_results(
             test_results,
             settings.fail_only,
-            not settings.no_color and sys.stdout.isatty()
+            not settings.no_color and sys.stdout.isatty(),
+            settings.echo
         )
 
 

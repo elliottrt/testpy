@@ -1,0 +1,5 @@
+{
+    "stdout": "test to make sure that \" are escaped properly in the json record files", 
+    "stderr": "", 
+    "returncode": 0
+}

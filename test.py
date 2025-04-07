@@ -10,15 +10,15 @@ from dataclasses import dataclass
 from typing import cast, Optional, Union, Any, Generator
 
 
-__version_info__ = (1, 0, 3)
+__version_info__ = (1, 0, 4)
 __version__ = '%d.%d.%d' % __version_info__
 
 '''
 TODO: actual docstrings for all functions, class methods included
 TODO: better fail messages - just printing TestCaseOutput is hard to understand
 TODO: should fail_only and echo work together -> echo only printed on failing?
-TODO: print out reason why unable to access file - bad perms, not exist, ...
 TODO: see if print_error is really needed
+TODO: option to time test cases and overall
 '''
 
 
@@ -117,7 +117,7 @@ class TestArguments(argparse.Namespace):
 # error_message: str -- the error message to print.
 # return: None.
 def print_error(error_message: str) -> None:
-    print(f'error: {error_message}')
+    print(f'ERROR: {error_message}')
 
 
 # Returns whether the file pointed to by the path exists and is a file.
@@ -150,7 +150,12 @@ def get_tests(
     # make sure the test directory is valid
     if is_valid_dir(test_path):
         # get all items and include full paths from where this is executed
-        matches = [os.path.join(test_path, fn) for fn in os.listdir(test_path)]
+
+        try:
+            matches = [os.path.join(test_path, fn) for fn in os.listdir(test_path)]
+        except PermissionError as e:
+            print_error(f'cannot access {test_path}: {e.strerror}')
+            exit(1)
 
         if recursive:
             child_dirs = [
@@ -216,8 +221,8 @@ def record_path_of(test_path: str, record_file_extension: str) -> str:
 def read_record_of(record_path: str) -> Union[TestCaseOutput, str]:
     # return the bytes if the file exists
     if is_valid_file(record_path):
-        with open(record_path, 'r') as record:
-            try:
+        try:
+            with open(record_path, 'r') as record:
                 record_json: dict[str, Union[str, int]] = json.load(record)
 
                 stdout = record_json['stdout']
@@ -228,11 +233,14 @@ def read_record_of(record_path: str) -> Union[TestCaseOutput, str]:
                     isinstance(stderr, str) and \
                         isinstance(returncode, int):
                     return TestCaseOutput(stdout, stderr, returncode)
-            except Exception:
-                pass
+        except PermissionError as e:
+            print_error(f'cannot access {record_path}: {e.strerror}')
+            exit(1)
+        except Exception:
+            pass
 
-            # error if the if statement fails or the json data is invalid
-            return 'BAD RECORD'
+        # error if the if statement fails or the json data is invalid
+        return 'BAD RECORD'
     else:
         return 'NO RECORD'
 
@@ -269,8 +277,8 @@ def run_and_capture(
 
     try:
         process = subprocess.run(test_command, capture_output=True, shell=True)
-    except Exception as excp:
-        return TestCaseException(test_command, excp)
+    except Exception as e:
+        return TestCaseException(test_command, e)
 
     return TestCaseOutput(
         # convert the bytes to a utf-8 string for storage

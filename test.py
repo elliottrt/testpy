@@ -366,7 +366,7 @@ def display_results(
         if result.skipped():
             if not fail_only:
                 if use_color:
-                    print(f'{test_string}\033[38;5;{8}mSKIPPED, ' +
+                    print(f'{test_string}\033[38;5;{8}mSKIPPED,',
                           f'{result.expected_output}\033[0m')
                 else:
                     print(f'{test_string}SKIPPED, {result.expected_output}')
@@ -554,7 +554,7 @@ def do_tests(argv: list[str]) -> int:
         return display_results(
             test_results,
             settings.fail_only,
-            not settings.no_color
+            not settings.no_color and sys.stdout.isatty()
         )
 
 

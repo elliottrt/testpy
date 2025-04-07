@@ -1,5 +1,5 @@
 {
-    "stdout": "TEST: 'example-tests/invalid-json.txt'... \u001b[38;5;8mSKIPPED, BAD RECORD\u001b[0m\n0/0 tests passed\nTEST: 'example-tests/missing-record.txt'... \u001b[38;5;8mSKIPPED, NO RECORD\u001b[0m\n0/0 tests passed\nTEST: 'example-tests/missing-stderr.txt'... \u001b[38;5;8mSKIPPED, BAD RECORD\u001b[0m\n0/0 tests passed\n", 
+    "stdout": "TEST: 'example-tests/invalid-json.txt'... SKIPPED, BAD RECORD\n0/0 tests passed\nTEST: 'example-tests/missing-record.txt'... SKIPPED, NO RECORD\n0/0 tests passed\nTEST: 'example-tests/missing-stderr.txt'... SKIPPED, BAD RECORD\n0/0 tests passed\n", 
     "stderr": "", 
     "returncode": 0
 }

@@ -320,7 +320,8 @@ def update_tests(
 def run_tests(
         template: ProgramTemplate,
         test_paths: list[str],
-        record_file_extension: str, echo: bool) -> Generator[TestResult]:
+        record_file_extension: str, echo: bool) -> Generator[TestResult, None, None]:
+
     for test_path in test_paths:
         # find the record path and read the expected output
         record_path = record_path_of(test_path, record_file_extension)
@@ -347,12 +348,12 @@ def print_failure(result: TestResult) -> None:
 
 
 # Print test case results.
-# results: Generator[TestResult] -- the Generator of results for each test.
+# results: Generator[TestResult, None, None] -- the Generator of results for each test.
 # fail_only: bool -- if true, only display information about failing tests.
 # color_text: bool -- whether to display colored text in results
 # return: int -- the exit code of the program.
 def display_results(
-        results: Generator[TestResult],
+        results: Generator[TestResult, None, None],
         fail_only: bool,
         use_color: bool) -> int:
 

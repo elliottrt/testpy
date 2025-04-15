@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import cast, Optional, Union, Any, Generator
 
 
-__version_info__ = (1, 0, 4)
+__version_info__ = (1, 0, 5)
 __version__ = '%d.%d.%d' % __version_info__
 
 '''
@@ -269,16 +269,24 @@ def write_record_of(record_path: str, output: TestCaseOutput) -> None:
 # Runs the program that is being tested with the test case file.
 # template: ProgramTemplate -- the program template to execute.
 # test_path: str -- the path to the test case file.
+# timeout: Optional[int] -- the number of milliseconds to wait before test
+#        timeout failure may be None, in which case there is no timeout
 # return: Union[TestCaseOutput, TestCaseException] -- the expected test case
 #       output or an exception if one occurred.
 def run_and_capture(
         template: ProgramTemplate,
-        test_path: str) -> Union[TestCaseOutput, TestCaseException]:
+        test_path: str,
+        timeout: Optional[int]) -> Union[TestCaseOutput, TestCaseException]:
     # format the test case command and split it for subprocess
     test_command = template.format(test_path)
 
     try:
-        process = subprocess.run(test_command, capture_output=True, shell=True)
+        process = subprocess.run(
+            test_command,
+            capture_output=True,
+            shell=True,
+            timeout=timeout / 1000 if timeout is not None else None
+        )
     except Exception as e:
         return TestCaseException(test_command, e)
 
@@ -297,13 +305,17 @@ def run_and_capture(
 # record_file_extension: str -- the file extension of record files.
 # create_empty: bool -- if set, creates empty test case files.
 # echo: bool -- whether to echo the commands that are executed.
+# timeout: Optional[int] -- the number of milliseconds to wait before test
+#        timeout failure may be None, in which case there is no timeout
 # return: None.
 def update_tests(
         template: ProgramTemplate,
         test_paths: list[str],
         record_file_extension: str,
         create_empty: bool,
-        echo: bool) -> None:
+        echo: bool,
+        timeout: Optional[int],
+        ) -> None:
 
     for test_path in test_paths:
         # find the record it belongs to
@@ -313,7 +325,7 @@ def update_tests(
             write_record_of(record_path, TestCaseOutput('', '', 0, None))
         else:
             # get the output from the test case
-            actual_output = run_and_capture(template, test_path)
+            actual_output = run_and_capture(template, test_path, timeout)
             # update the record with the new output
             if isinstance(actual_output, TestCaseOutput):
 
@@ -330,11 +342,14 @@ def update_tests(
 # template: ProgramTemplate -- the program template to execute.
 # test_paths: list[str] -- a list of test case file paths.
 # record_file_extension: str -- the file extension of record files.
+# timeout: Optional[int] -- the number of milliseconds to wait before test
+#        timeout failure may be None, in which case there is no timeout
 # return: list[TestResult] -- return the TestResult for each test.
 def run_tests(
         template: ProgramTemplate,
         test_paths: list[str],
-        record_file_extension: str) -> Generator[TestResult, None, None]:
+        record_file_extension: str,
+        timeout: int) -> Generator[TestResult, None, None]:
 
     for test_path in test_paths:
         # find the record path and read the expected output
@@ -345,7 +360,7 @@ def run_tests(
             # if expected output is an error message, skip the test
             # and don't run the test case
             None if isinstance(expected_output, str)
-            else run_and_capture(template, test_path)
+            else run_and_capture(template, test_path, timeout)
         )
 
 
@@ -505,15 +520,19 @@ def create_argparser() -> argparse.ArgumentParser:
         '-v', '--version', action='version',
         version='%(prog)s ' + __version__
     )
+    args.add_argument(
+        '-T', '--timeout', default=None, type=int,
+        help='number of milliseconds to wait until test failure due to timeout'
+    )
 
     return args
 
 
 # Main driver function, parses command line arguments and
 # either runs or updates tests.
-# argv: list[str] -- command line arguments.
+# argv: Optional[list[str]] -- command line arguments.
 # return: int -- the exit code of the program.
-def do_tests(argv: list[str]) -> int:
+def do_tests(argv: Optional[list[str]] = None) -> int:
     # create the ArgumentParser
     argparser = create_argparser()
 
@@ -524,6 +543,11 @@ def do_tests(argv: list[str]) -> int:
     if settings.test_ext is not None and \
             extensions_equal(settings.test_ext, settings.record_ext):
         argparser.error('record extension and test extension may not be equal')
+
+    if settings.timeout is not None and settings.timeout < 1:
+        argparser.error(
+            f'invalid timeout value {settings.timeout}ms, must be at least 1'
+        )
 
     program_template = ProgramTemplate(
         settings.program_template,
@@ -542,7 +566,7 @@ def do_tests(argv: list[str]) -> int:
     if len(invalid_paths) > 0:
         for invalid_path in invalid_paths:
             print_error(
-                f'unable to access \'{invalid_path}\''
+                f'unable to access test case file/dir \'{invalid_path}\''
             )
         return 1
 
@@ -559,7 +583,8 @@ def do_tests(argv: list[str]) -> int:
             flattened_test_list,
             settings.record_ext,
             settings.create_empty,
-            settings.echo
+            settings.echo,
+            settings.timeout
         )
 
         return 0
@@ -568,7 +593,8 @@ def do_tests(argv: list[str]) -> int:
         test_results = run_tests(
             program_template,
             flattened_test_list,
-            settings.record_ext
+            settings.record_ext,
+            settings.timeout
         )
 
         return display_results(
@@ -580,4 +606,4 @@ def do_tests(argv: list[str]) -> int:
 
 
 if __name__ == '__main__':
-    sys.exit(do_tests(sys.argv[1:]))
+    exit(do_tests())

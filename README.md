@@ -36,8 +36,14 @@ The `-c` and `--create-empty` options will generate empty test case records, whi
 
 ### Test Case Customization
 
-The file extension of test cases may be specified with `-e <extension>` and `--test-ext <extenision>`, or left empty, in which case all files except record files are tested.
+The file extension of test cases may be specified with `-e <extension>` and `--test-ext <extension>`, or left empty, in which case all files except record files are tested.
 
-The record file extension may be specified with `-r <extension>` and `--record-ext <extenision>`, or left empty, in which case it defaults to '.rec'.
+The record file extension may be specified with `-r <extension>` and `--record-ext <extension>`, or left empty, in which case it defaults to '.rec'.
 
 These two may not be the same, and test.py will error if they are.
+
+### Other
+
+* `-o` and `--no-color` options disable color printing for test case FAIL/PASS/SKIPPED messages.
+* `-e` and `--echo` options print out what command is being run for each test case before it happens.
+* `-T` and `--timeout` options enforces a timeout, in milliseconds, on each test case. If the test case takes longer than that duration, it fails. By default this is not enabled.

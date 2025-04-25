@@ -316,8 +316,7 @@ def update_tests(
         record_file_extension: str,
         create_empty: bool,
         echo: bool,
-        timeout: Optional[int],
-        ) -> None:
+        timeout: Optional[int]) -> None:
 
     for test_path in test_paths:
         # find the record it belongs to

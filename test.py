@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import cast, Optional, Union, Any, Generator
 
 
-__version_info__ = (1, 1, 3)
+__version_info__ = (1, 1, 4)
 __version__ = '%d.%d.%d' % __version_info__
 
 '''
@@ -287,6 +287,11 @@ def run_and_capture(
             capture_output=True,
             shell=True,
             timeout=timeout / 1000 if timeout is not None else None
+        )
+    except subprocess.TimeoutExpired as e:
+        return (
+            TestCaseException(command, Exception(f'timed out after {e.timeout} seconds')),
+            time.time() - time_start
         )
     except Exception as e:
         return (TestCaseException(command, e), time.time() - time_start)

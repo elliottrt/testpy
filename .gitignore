@@ -1,5 +1,6 @@
-# mypy caching
+# ide caching
 .mypy_cache/
+.ropeproject/
 
 # vscode settings
 .vscode/

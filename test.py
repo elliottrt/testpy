@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import cast, Optional, Union, Any, Generator
 
 
-__version_info__ = (1, 0, 6)
+__version_info__ = (1, 1, 0)
 __version__ = '%d.%d.%d' % __version_info__
 
 '''

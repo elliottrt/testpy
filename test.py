@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import cast, Optional, Union, Any, Generator
 
 
-__version_info__ = (1, 1, 1)
+__version_info__ = (1, 1, 2)
 __version__ = '%d.%d.%d' % __version_info__
 
 '''
@@ -26,8 +26,6 @@ class TestCaseOutput:
     stdout: str
     stderr: str
     returncode: int
-    command: Optional[str]
-    runtime: Optional[float]
 
     def __eq__(self, value: Any) -> bool:
         if isinstance(value, TestCaseOutput):
@@ -66,6 +64,8 @@ class TestCaseException:
 class TestResult:
     test_path: str
     record_path: str
+    command: str
+    runtime: float
     expected_output: Union[TestCaseOutput, str]
     actual_output: Optional[Union[TestCaseOutput, TestCaseException]]
 
@@ -241,7 +241,7 @@ def read_record_of(record_path: str) -> Union[TestCaseOutput, str]:
                 if isinstance(stdout, str) and \
                     isinstance(stderr, str) and \
                         isinstance(returncode, int):
-                    return TestCaseOutput(stdout, stderr, returncode, None, None)
+                    return TestCaseOutput(stdout, stderr, returncode)
         except PermissionError as e:
             print_error(f'cannot access {record_path}: {e.strerror}')
             exit(1)
@@ -269,45 +269,40 @@ def write_record_of(record_path: str, output: TestCaseOutput) -> None:
 
 
 # Runs the program that is being tested with the test case file.
-# template: ProgramTemplate -- the program template to execute.
-# test_path: str -- the path to the test case file.
-# timeout: Optional[int] -- the number of milliseconds to wait before test
-#        timeout failure may be None, in which case there is no timeout
-# runtime: bool -- if True, records and displays the runtime of each test case
-# return: Union[TestCaseOutput, TestCaseException] -- the expected test case
-#       output or an exception if one occurred.
+# command: str -- the shell command to run for the test case.
+# timeout: Optional[int] -- the number of milliseconds to wait before test.
+#        timeout failure may be None, in which case there is no timeout.
+# return: tuple[Union[TestCaseOutput, TestCaseException], float] -- the expected
+#       test case output or an exception if one occurred, as well as the runtime.
 def run_and_capture(
-        template: ProgramTemplate,
-        test_path: str,
-        timeout: Optional[int],
-        runtime: bool) -> Union[TestCaseOutput, TestCaseException]:
+        command: str,
+        timeout: Optional[int]) -> tuple[Union[TestCaseOutput, TestCaseException], float]:
+
+    time_start = time.time()
+
     # format the test case command and split it for subprocess
-    test_command = template.format(test_path)
-
     try:
-        time_start = time.time()
-
         process = subprocess.run(
-            test_command,
+            command,
             capture_output=True,
             shell=True,
             timeout=timeout / 1000 if timeout is not None else None
         )
-
-        time_end = time.time()
-
-        return TestCaseOutput(
-            # convert the bytes to a utf-8 string for storage
-            str(process.stdout, encoding='utf-8'),
-            str(process.stderr, encoding='utf-8'),
-            process.returncode,
-            test_command,
-            (time_end - time_start if runtime else None)
-        )
     except subprocess.TimeoutExpired:
-        return TestCaseException(test_command, Exception('timed out'))
+        # TODO: couldn't we remove this case and use the regular exception case?
+        return (
+            TestCaseException(command, Exception('timed out')),
+            time.time() - time_start
+        )
     except Exception as e:
-        return TestCaseException(test_command, e)
+        return (TestCaseException(command, e), time.time() - time_start)
+
+    return (TestCaseOutput(
+        # convert the bytes to a utf-8 string for storage
+        str(process.stdout, encoding='utf-8'),
+        str(process.stderr, encoding='utf-8'),
+        process.returncode,
+    ), time.time() - time_start)
 
 
 # Record test results to test against in future runs.
@@ -320,7 +315,7 @@ def run_and_capture(
 # timeout: Optional[int] -- the number of milliseconds to wait before test
 #        timeout failure may be None, in which case there is no timeout
 # time: bool -- if True, records and displays the runtime of each test case
-# return: None.
+# return: int -- 0 on success, 1 on failure.
 def update_tests(
         template: ProgramTemplate,
         test_paths: list[str],
@@ -329,19 +324,24 @@ def update_tests(
         use_color: bool,
         echo: bool,
         timeout: Optional[int],
-        time: bool) -> None:
+        time: bool) -> int:
 
+    tests_updated = 0
+    total_tests = 0
+    total_time = 0.0
     for test_path in test_paths:
         # find the record it belongs to
         record_path = record_path_of(test_path, record_file_extension)
         if create_empty:
             # write an empty test case if requested
-            write_record_of(record_path, TestCaseOutput('', '', 0, None, None))
+            write_record_of(record_path, TestCaseOutput('', '', 0))
+            tests_updated += 1
         else:
             test_string = f'TEST: \'{test_path}\'... '
+            command = template.format(test_path)
 
             # get the output from the test case
-            actual_output = run_and_capture(template, test_path, timeout, time)
+            actual_output, runtime = run_and_capture(command, timeout)
             # update the record with the new output
             if isinstance(actual_output, TestCaseOutput):
                 if use_color:
@@ -349,18 +349,33 @@ def update_tests(
                 else:
                     print(f'{test_string}UPDATED')
                 if echo:
-                    print(f'  CMD: {actual_output.command}')
+                    print(f'  CMD: {command}')
                 if time:
-                    print(f'  TIME: {actual_output.runtime:.3f} sec')
+                    print(f'  TIME: {runtime:.3f} sec')
 
                 write_record_of(record_path, actual_output)
+                tests_updated += 1
             else:
                 if use_color:
                     print(f'{test_string}\033[38;5;{9}mERROR\033[0m')
                 else:
                     print(f'{test_string}ERROR')
-                # TODO: also print runtime and command here on failure, will require modifying run_and_capture
+                if echo:
+                    print(f'  CMD: {command}')
+                if time:
+                    print(f'  TIME: {runtime:.3f} sec')
                 print('  ERROR:', actual_output.error_string())
+
+        total_tests += 1
+        total_time += runtime
+
+    time_str = f', time: {total_time:.3f} secs' if time else ''
+    action_str = 'created' if create_empty else 'updated'
+
+    print(f'{tests_updated}/{total_tests} tests ' + action_str + time_str)
+
+    # return success if all tests passed, else failure
+    return 0 if tests_updated == total_tests else 1
 
 
 # Run each test, compare it to the corresponding record file,
@@ -383,12 +398,18 @@ def run_tests(
         # find the record path and read the expected output
         record_path = record_path_of(test_path, record_file_extension)
         expected_output = read_record_of(record_path)
+        command = template.format(test_path)
+        test_result = None
+        runtime = 0.0
+
+        # if expected output is an error message, skip the test
+        # and don't run the test case
+        if not isinstance(expected_output, str):
+            test_result, runtime = run_and_capture(command, timeout)
+
         yield TestResult(
-            test_path, record_path, expected_output,
-            # if expected output is an error message, skip the test
-            # and don't run the test case
-            None if isinstance(expected_output, str)
-            else run_and_capture(template, test_path, timeout, time)
+            test_path, record_path, command, runtime,
+            expected_output, test_result
         )
 
 
@@ -448,7 +469,7 @@ def display_results(
 
     tests_passed = 0
     total_tests = 0
-    total_time = 0
+    total_time = 0.0
 
     for result in results:
         test_string = f'TEST: \'{result.test_path}\'... '
@@ -470,27 +491,31 @@ def display_results(
                 else:
                     print(f'{test_string}OK')
                 if echo:
-                    print(f'  CMD: {result.actual_output.command}')
-                if result.actual_output.runtime:
-                    print(f'  TIME: {result.actual_output.runtime:.3f} sec')
-                    total_time += result.actual_output.runtime
+                    print(f'  CMD: {result.command}')
+                if time:
+                    print(f'  TIME: {result.runtime:.3f} sec')
 
             tests_passed += 1
             total_tests += 1
+            total_time += result.runtime
         # if the test failed, print the difference between expected and actual
         else:
             if use_color:
                 print(f'{test_string}\033[38;5;{9}mFAIL\033[0m')
             else:
                 print(f'{test_string}FAIL')
-            # TODO: also print runtime and command here on failure, will require modifying run_and_capture
-            # TODO: update total_time here too
+            if echo:
+                print(f'  CMD: {result.command}')
+            if time:
+                print(f'  TIME: {result.runtime:.3f} sec')
+
             print_failure(result)
             total_tests += 1
+            total_time += result.runtime
 
     time_str = f', time: {total_time:.3f} secs' if time else ''
 
-    print(f'{tests_passed}/{total_tests} tests passed', time_str, sep='')
+    print(f'{tests_passed}/{total_tests} tests passed' + time_str)
 
     # return success if all tests passed, else failure
     return 0 if tests_passed == total_tests else 1
@@ -647,7 +672,7 @@ def do_tests(argv: Optional[list[str]] = None) -> int:
 
     # if we need to update the tests, do that
     if settings.update or settings.create_empty:
-        update_tests(
+        return update_tests(
             program_template,
             flattened_test_list,
             settings.record_ext,
@@ -657,8 +682,6 @@ def do_tests(argv: Optional[list[str]] = None) -> int:
             settings.timeout,
             settings.time
         )
-
-        return 0
     # otherwise run the tests and return the exitcode display_results returns
     else:
         test_results = run_tests(

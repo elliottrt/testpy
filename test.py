@@ -1,9 +1,10 @@
-#! python3
+#!/usr/bin/env python3
 
 # Ordered by length.
 import os
 import sys
 import json
+import difflib
 import argparse
 import subprocess
 from dataclasses import dataclass
@@ -15,7 +16,6 @@ __version__ = '%d.%d.%d' % __version_info__
 
 '''
 TODO: actual docstrings for all functions, class methods included
-TODO: better fail messages - just printing TestCaseOutput is hard to understand
 TODO: see if print_error is really needed
 TODO: option to time test cases and overall
 '''
@@ -365,16 +365,44 @@ def run_tests(
         )
 
 
+# Print diff information between the expected and actual lines.
+# label: str -- name of the line source, usually stdout or stderr
+# expected: str -- expected output lines, not split
+# actual: str -- actual output lines, not split
+# return: None.
+def print_diff(label: str, expected: str, actual: str) -> None:
+    if expected != actual:
+        exp_lines = expected.splitlines()
+        act_lines = actual.splitlines()
+        # diff = difflib.unified_diff(
+        #     exp_lines, act_lines, fromfile='expected', tofile='actual', lineterm=''
+        # )
+
+        diff = difflib.Differ().compare(exp_lines, act_lines)
+
+        print(f'{label} DIFFERS (- EXPECTED, + ACTUAL)')
+        for line in diff:
+            print(line)
+    else:
+        print(f'{label} MATCHES')
+
+
 # Print test failure information.
 # result: TestResult -- the result information for the failed test.
 # return: None.
 def print_failure(result: TestResult) -> None:
     if isinstance(result.actual_output, TestCaseOutput):
-        # print out expected and actual for failed test cases
-        print(f'    EXPECTED: {result.expected_output}')
-        print(f'    ACTUAL:   {result.actual_output}')
+        assert isinstance(result.expected_output, TestCaseOutput)
+
+        exp = result.expected_output
+        act = result.actual_output
+
+        print_diff('STDOUT', exp.stdout, act.stdout)
+        print_diff('STDERR', exp.stderr, act.stderr)
+        print_diff('EXITCODE', str(exp.returncode), str(act.returncode))
+
     elif isinstance(result.actual_output, TestCaseException):
-        print(f'    ERROR: {result.actual_output.error_string()}')
+        print(f'ERROR: {result.actual_output.error_string()}')
 
 
 # Print test case results.
@@ -400,13 +428,12 @@ def display_results(
 
         test_string = f'TEST: \'{result.test_path}\'... '
         # if result was skipped, ignore this case
-        if result.skipped():
-            if not fail_only:
-                if use_color:
-                    print(f'{test_string}\033[38;5;{8}mSKIPPED,',
-                          f'{result.expected_output}\033[0m')
-                else:
-                    print(f'{test_string}SKIPPED, {result.expected_output}')
+        if result.skipped() and not fail_only:
+            if use_color:
+                print(f'{test_string}\033[38;5;{8}mSKIPPED,',
+                      f'{result.expected_output}\033[0m')
+            else:
+                print(f'{test_string}SKIPPED, {result.expected_output}')
         # if the test pass, print that and increase the number of
         # successful tests and total tests
         elif result.passed():
@@ -572,7 +599,7 @@ def do_tests(argv: Optional[list[str]] = None) -> int:
         return 1
 
     flattened_test_list = [
-        test_case for path, test_list in tests_to_run.items()
+        test_case for _, test_list in tests_to_run.items()
         if test_list is not None
         for test_case in test_list
     ]

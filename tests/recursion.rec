@@ -1,5 +1,5 @@
 {
-    "stdout": "TEST: 'example-tests/recursive-test/recursive-test-2/should-fail.txt'... FAIL\n    EXPECTED: TestCaseOutput(stdout='this should fail', stderr='this fails because i made it fail', returncode=4)\n    ACTUAL:   TestCaseOutput(stdout='this should fail', stderr='', returncode=0)\nTEST: 'example-tests/recursive-test/should-succeed.txt'... OK\n1/2 tests passed\n", 
+    "stdout": "TEST: 'example-tests/recursive-test/recursive-test-2/should-fail.txt'... FAIL\nSTDOUT MATCHES\nSTDERR DIFFERS (- EXPECTED, + ACTUAL)\n- this fails because i made it fail\nEXITCODE DIFFERS (- EXPECTED, + ACTUAL)\n- 4\n+ 0\nTEST: 'example-tests/recursive-test/should-succeed.txt'... OK\n1/2 tests passed\n", 
     "stderr": "", 
     "returncode": 1
 }

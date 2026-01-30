@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import cast, Optional, Union, Any, Generator
 
 
-__version_info__ = (1, 1, 2)
+__version_info__ = (1, 1, 3)
 __version__ = '%d.%d.%d' % __version_info__
 
 '''
@@ -288,12 +288,6 @@ def run_and_capture(
             shell=True,
             timeout=timeout / 1000 if timeout is not None else None
         )
-    except subprocess.TimeoutExpired:
-        # TODO: couldn't we remove this case and use the regular exception case?
-        return (
-            TestCaseException(command, Exception('timed out')),
-            time.time() - time_start
-        )
     except Exception as e:
         return (TestCaseException(command, e), time.time() - time_start)
 
@@ -538,13 +532,13 @@ def create_argparser() -> argparse.ArgumentParser:
 
     PROGRAM_TEMPLATE_EXPLANATION = (
         'The program_template argument describes what command to run for '
-        'each test. This may be a single executable or a more complex command.'
+        'each test. This may be a single executable or a more complex command. '
         'For a simple executable, the test file path is appended to the end of'
-        ' the command, like \'<executable> <test file path>\'.'
+        ' the command, like \'<executable> <test file path>\'. '
         'If the desired command is more complex, quotes ("", \'\') should be '
         'used around the command and a symbol may be use which is replaced '
         'with the name of the test case file for each test case. This can be '
-        'set with the \'-s\' and \'--symbol\' arguments.'
+        'set with the \'-s\' and \'--symbol\' arguments. '
         'For example, \'python @ 1 2 3\' will run each test case with \'@\' '
         'replaced with the test case file path.'
     )
